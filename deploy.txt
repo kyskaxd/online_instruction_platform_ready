@@ -1,0 +1,9 @@
+backend
+cd backend/InstructionPlatform.Api
+dotnet restore
+dotnet run --launch-profile https
+
+frontend
+cd frontend/instruction-platform-client
+npm install
+npm run dev
