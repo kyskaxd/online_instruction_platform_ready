@@ -1,0 +1,48 @@
+{
+  "title": "Инструктаж по охране труда",
+  "description": "Проверка знаний после изучения PDF-материала",
+  "passingScorePercent": 80,
+  "trainingMaterialId": null,
+  "questions": [
+    {
+      "text": "Что нужно сделать при обнаружении пожара?",
+      "type": "SingleChoice",
+      "options": [
+        {
+          "text": "Сообщить руководителю и вызвать пожарную охрану",
+          "isCorrect": true
+        },
+        {
+          "text": "Продолжить работу",
+          "isCorrect": false
+        },
+        {
+          "text": "Спрятаться и ждать",
+          "isCorrect": false
+        }
+      ]
+    },
+    {
+      "text": "Какие средства индивидуальной защиты могут использоваться на производстве?",
+      "type": "MultipleChoice",
+      "options": [
+        {
+          "text": "Каска",
+          "isCorrect": true
+        },
+        {
+          "text": "Защитные очки",
+          "isCorrect": true
+        },
+        {
+          "text": "Наушники для музыки",
+          "isCorrect": false
+        },
+        {
+          "text": "Спецодежда",
+          "isCorrect": true
+        }
+      ]
+    }
+  ]
+}

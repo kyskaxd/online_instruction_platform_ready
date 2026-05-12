@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: instruction_platform_postgres
+    environment:
+      POSTGRES_DB: instruction_platform
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - instruction_platform_pgdata:/var/lib/postgresql/data
+
+volumes:
+  instruction_platform_pgdata:

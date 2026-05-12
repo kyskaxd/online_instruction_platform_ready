@@ -1,0 +1,10 @@
+**/bin/
+**/obj/
+**/node_modules/
+**/dist/
+**/uploads/
+.vs/
+.idea/
+*.user
+*.suo
+.env
