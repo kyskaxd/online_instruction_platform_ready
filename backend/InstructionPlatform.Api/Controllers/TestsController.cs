@@ -142,6 +142,61 @@ public class TestsController(AppDbContext db) : ControllerBase
         return NoContent();
     }
 
+    [Authorize(Roles = "Admin")]
+    [HttpDelete("{testId:int}")]
+    public async Task<IActionResult> Delete(int testId)
+    {
+        var test = await db.Tests.FirstOrDefaultAsync(x => x.Id == testId);
+        if (test is null)
+        {
+            return NotFound("Тест не найден.");
+        }
+
+        await using var transaction = await db.Database.BeginTransactionAsync();
+
+        var attemptIds = await db.TestAttempts
+            .Where(x => x.TestId == testId)
+            .Select(x => x.Id)
+            .ToListAsync();
+
+        var attemptAnswers = await db.TestAttemptAnswers
+            .Where(x => attemptIds.Contains(x.TestAttemptId))
+            .ToListAsync();
+        db.TestAttemptAnswers.RemoveRange(attemptAnswers);
+
+        var attempts = await db.TestAttempts
+            .Where(x => x.TestId == testId)
+            .ToListAsync();
+        db.TestAttempts.RemoveRange(attempts);
+
+        var assignments = await db.TestAssignments
+            .Where(x => x.TestId == testId)
+            .ToListAsync();
+        db.TestAssignments.RemoveRange(assignments);
+
+        var questionIds = await db.TestQuestions
+            .Where(x => x.TestId == testId)
+            .Select(x => x.Id)
+            .ToListAsync();
+
+        var answerOptions = await db.TestAnswerOptions
+            .Where(x => questionIds.Contains(x.TestQuestionId))
+            .ToListAsync();
+        db.TestAnswerOptions.RemoveRange(answerOptions);
+
+        var questions = await db.TestQuestions
+            .Where(x => x.TestId == testId)
+            .ToListAsync();
+        db.TestQuestions.RemoveRange(questions);
+
+        db.Tests.Remove(test);
+
+        await db.SaveChangesAsync();
+        await transaction.CommitAsync();
+
+        return NoContent();
+    }
+
     [Authorize(Roles = "Employee")]
     [HttpGet("my")]
     public async Task<ActionResult<List<MyTestAssignmentDto>>> GetMyTests()

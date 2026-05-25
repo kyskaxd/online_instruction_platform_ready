@@ -10,7 +10,7 @@
         <router-link v-if="isManager" to="/reports">Отчёты</router-link>
       </nav>
       <div class="userbox">
-        <span>{{ user.email }} · {{ user.role }}</span>
+        <span>{{ user.email }} · {{ roleLabel }}</span>
         <button @click="logout">Выйти</button>
       </div>
     </header>
@@ -31,6 +31,15 @@ const user = currentUser
 const isEmployee = computed(() => user.value?.role === 'Employee')
 const isAdmin = computed(() => user.value?.role === 'Admin')
 const isManager = computed(() => ['Admin', 'Manager'].includes(user.value?.role))
+const roleLabel = computed(() => {
+  const labels = {
+    Admin: 'Админ',
+    Manager: 'Менеджер',
+    Employee: 'Сотрудник'
+  }
+
+  return labels[user.value?.role] || user.value?.role
+})
 
 async function logout() {
   await logoutSession()

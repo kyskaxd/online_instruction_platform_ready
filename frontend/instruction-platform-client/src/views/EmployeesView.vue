@@ -12,13 +12,13 @@
       <label>Должность<input v-model="form.position" required></label>
       <label>Email<input v-model="form.email" type="email" required></label>
       <label>Дата найма<input v-model="form.hireDate" type="date"></label>
-      <label>Пароль<input v-model="form.password"  required></label>
+      <label>Пароль<input v-model="form.password" required></label>
       <label>
         Роль
         <select v-model="form.role">
-          <option>Employee</option>
-          <option>Manager</option>
-          <option>Admin</option>
+          <option value="Employee">Сотрудник</option>
+          <option value="Manager">Менеджер</option>
+          <option value="Admin">Админ</option>
         </select>
       </label>
       <button :disabled="isSaving">Добавить</button>
@@ -45,7 +45,7 @@
             <h3>{{ employee.lastName }} {{ employee.firstName }} {{ employee.middleName || '' }}</h3>
             <p>{{ employee.email }}</p>
           </div>
-          <span class="badge">{{ employee.role }}</span>
+          <span class="badge">{{ roleLabel(employee.role) }}</span>
         </div>
 
         <dl>
@@ -98,6 +98,12 @@ const form = reactive({
   password: '',
   role: 'Employee'
 })
+
+const roleLabels = {
+  Admin: 'Админ',
+  Manager: 'Менеджер',
+  Employee: 'Сотрудник'
+}
 
 const filteredEmployees = computed(() => {
   const query = searchQuery.value.trim().toLowerCase()
@@ -175,6 +181,10 @@ function canDelete(employee) {
   return currentUser?.role === 'Admin' && currentUser.employeeId !== employee.id
 }
 
+function roleLabel(role) {
+  return roleLabels[role] || role
+}
+
 function formatDate(value) {
   if (!value) {
     return 'Не указана'
@@ -220,8 +230,16 @@ onMounted(loadEmployees)
 
 .employee-card__top {
   display: flex;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
+}
+
+.employee-card__top .badge {
+  flex: 0 0 auto;
+  min-height: 28px;
+  padding: 6px 12px;
+  line-height: 1;
 }
 
 .employee-card h3 {
@@ -270,6 +288,5 @@ onMounted(loadEmployees)
     align-items: stretch;
     flex-direction: column;
   }
-
 }
 </style>

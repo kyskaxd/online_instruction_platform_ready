@@ -49,7 +49,7 @@
           <td>{{ row.employeeFullName }}<br><small>{{ row.position }}</small></td>
           <td>{{ row.department }}</td>
           <td>{{ row.testTitle }}</td>
-          <td>{{ row.status }}</td>
+          <td><span :class="['status-text', statusClass(row.status)]">{{ statusLabel(row.status) }}</span></td>
           <td>{{ row.scorePercent ?? '-' }}</td>
           <td>{{ row.completedAt ? new Date(row.completedAt).toLocaleString() : '-' }}</td>
         </tr>
@@ -68,6 +68,13 @@ const employees = ref([])
 const error = ref('')
 const filters = reactive({ department: '', testId: '', employeeId: '' })
 
+const statusLabels = {
+  Assigned: 'Назначен',
+  InProgress: 'В процессе',
+  Passed: 'Пройден',
+  Failed: 'Не пройден'
+}
+
 function buildQuery() {
   const params = new URLSearchParams()
   if (filters.department) params.set('department', filters.department)
@@ -78,7 +85,7 @@ function buildQuery() {
 
 async function loadDictionaries() {
   tests.value = await apiFetch('/api/tests')
-  employees.value = await apiFetch('/api/employees')
+  employees.value = await apiFetch('/api/employees/lookup')
 }
 
 async function loadReport() {
@@ -107,6 +114,19 @@ async function downloadExcel() {
   }
 }
 
+function statusLabel(status) {
+  return statusLabels[status] || status
+}
+
+function statusClass(status) {
+  return {
+    Assigned: 'status-text--assigned',
+    InProgress: 'status-text--assigned',
+    Passed: 'status-text--passed',
+    Failed: 'status-text--failed'
+  }[status] || ''
+}
+
 onMounted(async () => {
   await loadDictionaries()
   await loadReport()
@@ -118,5 +138,21 @@ onMounted(async () => {
   display: flex;
   align-items: end;
   gap: 10px;
+}
+
+.status-text {
+  font-weight: 700;
+}
+
+.status-text--assigned {
+  color: #2653ff;
+}
+
+.status-text--passed {
+  color: #027a48;
+}
+
+.status-text--failed {
+  color: #b42318;
 }
 </style>

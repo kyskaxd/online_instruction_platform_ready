@@ -184,7 +184,7 @@ public class ReportsController(AppDbContext db) : ControllerBase
                 row.Department,
                 row.Position,
                 row.TestTitle,
-                row.Status,
+                StatusLabel(row.Status),
                 row.ScorePercent?.ToString() ?? string.Empty,
                 row.IsPassed switch { true => "Да", false => "Нет", _ => string.Empty },
                 FormatDate(row.AssignedAt),
@@ -227,6 +227,18 @@ public class ReportsController(AppDbContext db) : ControllerBase
     }
 
     private static string FormatDate(DateTime value) => value.ToString("yyyy-MM-dd HH:mm");
+
+    private static string StatusLabel(string status)
+    {
+        return status switch
+        {
+            "Assigned" => "Назначен",
+            "InProgress" => "В процессе",
+            "Passed" => "Пройден",
+            "Failed" => "Не пройден",
+            _ => status
+        };
+    }
 
     private static string EscapeXml(string value)
     {

@@ -5,11 +5,11 @@
     <div v-if="success" class="success">{{ success }}</div>
 
     <h2>Импорт теста из JSON</h2>
-    <p>Можно вставить JSON вручную или загрузить файл. Пример лежит в папке <code>docs/sample-test-import.json</code>.</p>
+
     <textarea v-model="jsonText"></textarea>
-    <div style="display:flex; gap:12px; margin-top:12px; flex-wrap:wrap;">
+    <div class="test-actions">
       <button @click="importFromText">Импортировать из текста</button>
-      <label style="display:block; max-width:320px;">
+      <label class="file-field">
         Загрузить JSON-файл
         <input type="file" accept="application/json" @change="importFromFile">
       </label>
@@ -25,6 +25,7 @@
           <th>Вопросов</th>
           <th>Проходной балл</th>
           <th>Назначить</th>
+          <th v-if="isAdmin"></th>
         </tr>
       </thead>
       <tbody>
@@ -33,13 +34,22 @@
           <td>{{ test.questionsCount }}</td>
           <td>{{ test.passingScorePercent }}%</td>
           <td>
-            <select v-model="assignEmployeeIds[test.id]" multiple style="min-width:220px; min-height:90px;">
+            <select v-model="assignEmployeeIds[test.id]" multiple class="assign-select">
               <option v-for="employee in employees" :key="employee.id" :value="employee.id">
-                {{ employee.lastName }} {{ employee.firstName }} — {{ employee.department }}
+                {{ employee.lastName }} {{ employee.firstName }} - {{ employee.department }}
               </option>
             </select>
             <br>
-            <button class="secondary" style="margin-top:8px;" @click="assign(test.id)">Назначить выбранным</button>
+            <button class="secondary assign-button" @click="assign(test.id)">Назначить выбранным</button>
+          </td>
+          <td v-if="isAdmin">
+            <button
+              class="danger"
+              :disabled="deletingId === test.id"
+              @click="deleteTest(test)"
+            >
+              Удалить
+            </button>
           </td>
         </tr>
       </tbody>
@@ -48,14 +58,16 @@
 </template>
 
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
-import { apiFetch } from '../api'
+import { computed, onMounted, reactive, ref } from 'vue'
+import { apiFetch, getCurrentUser } from '../api'
 
 const tests = ref([])
 const employees = ref([])
 const error = ref('')
 const success = ref('')
+const deletingId = ref(null)
 const assignEmployeeIds = reactive({})
+const isAdmin = computed(() => getCurrentUser()?.role === 'Admin')
 const jsonText = ref(JSON.stringify({
   title: 'Инструктаж по охране труда',
   description: 'Первичный тест после изучения PDF',
@@ -76,7 +88,7 @@ const jsonText = ref(JSON.stringify({
 
 async function load() {
   tests.value = await apiFetch('/api/tests')
-  employees.value = await apiFetch('/api/employees')
+  employees.value = await apiFetch('/api/employees/lookup')
 }
 
 async function importFromText() {
@@ -99,13 +111,20 @@ async function importFromFile(event) {
   error.value = ''
   success.value = ''
   try {
+    const file = event.target.files[0]
+    if (!file) {
+      return
+    }
+
     const data = new FormData()
-    data.append('file', event.target.files[0])
+    data.append('file', file)
     await apiFetch('/api/tests/import-file', { method: 'POST', body: data })
     success.value = 'Тест импортирован из файла'
     await load()
   } catch (e) {
     error.value = e.message
+  } finally {
+    event.target.value = ''
   }
 }
 
@@ -124,5 +143,49 @@ async function assign(testId) {
   }
 }
 
+async function deleteTest(test) {
+  if (!confirm(`Удалить тест "${test.title}"?`)) {
+    return
+  }
+
+  error.value = ''
+  success.value = ''
+  deletingId.value = test.id
+
+  try {
+    await apiFetch(`/api/tests/${test.id}`, { method: 'DELETE' })
+    success.value = 'Тест удалён'
+    delete assignEmployeeIds[test.id]
+    await load()
+  } catch (e) {
+    error.value = e.message
+  } finally {
+    deletingId.value = null
+  }
+}
+
 onMounted(load)
 </script>
+
+<style scoped>
+.test-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+
+.file-field {
+  display: block;
+  max-width: 320px;
+}
+
+.assign-select {
+  min-width: 220px;
+  min-height: 90px;
+}
+
+.assign-button {
+  margin-top: 8px;
+}
+</style>

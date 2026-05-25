@@ -1,7 +1,7 @@
 <template>
   <section class="card" style="max-width: 480px; margin: 70px auto;">
     <h1>Вход</h1>
-    <p>После первого запуска уже создан администратор:</p>
+    
     
 
     <div v-if="error" class="error">{{ error }}</div>

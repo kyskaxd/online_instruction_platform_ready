@@ -14,6 +14,14 @@ public record EmployeeDto(
     UserRole Role,
     bool IsActive);
 
+public record EmployeeLookupDto(
+    int Id,
+    string LastName,
+    string FirstName,
+    string? MiddleName,
+    string Department,
+    string Position);
+
 public record CreateEmployeeRequest(
     string LastName,
     string FirstName,

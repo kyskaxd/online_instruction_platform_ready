@@ -30,6 +30,27 @@ public class EmployeesController(AppDbContext db, PasswordHashService passwordHa
         return Ok(employees);
     }
 
+    [Authorize(Roles = "Admin,Manager")]
+    [HttpGet("lookup")]
+    public async Task<ActionResult<List<EmployeeLookupDto>>> GetLookup()
+    {
+        var employees = await db.Employees
+            .AsNoTracking()
+            .Where(x => x.IsActive)
+            .OrderBy(x => x.Department)
+            .ThenBy(x => x.LastName)
+            .Select(x => new EmployeeLookupDto(
+                x.Id,
+                x.LastName,
+                x.FirstName,
+                x.MiddleName,
+                x.Department,
+                x.Position))
+            .ToListAsync();
+
+        return Ok(employees);
+    }
+
     [Authorize(Roles = "Admin")]
     [HttpGet("{id:int}")]
     public async Task<ActionResult<EmployeeDto>> GetById(int id)
