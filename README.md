@@ -57,13 +57,7 @@ online_instruction_platform_ready/
 
 ## 2. Создать базу данных
 
-Вариант через Docker:
-
-```bash
-docker compose up -d
-```
-
-Или вручную через pgAdmin/psql создай базу:
+Через pgAdmin/psql создай базу:
 
 ```sql
 CREATE DATABASE instruction_platform;
