@@ -4,11 +4,9 @@
     <div v-if="error" class="error">{{ error }}</div>
     <div v-if="success" class="success">{{ success }}</div>
 
-    <h2>Импорт теста из JSON</h2>
+    <h2>Импорт теста из JSON-файла</h2>
 
-    <textarea v-model="jsonText"></textarea>
     <div class="test-actions">
-      <button @click="importFromText">Импортировать из текста</button>
       <label class="file-field">
         Загрузить JSON-файл
         <input type="file" accept="application/json" @change="importFromFile">
@@ -68,43 +66,10 @@ const success = ref('')
 const deletingId = ref(null)
 const assignEmployeeIds = reactive({})
 const isAdmin = computed(() => getCurrentUser()?.role === 'Admin')
-const jsonText = ref(JSON.stringify({
-  title: 'Инструктаж по охране труда',
-  description: 'Первичный тест после изучения PDF',
-  passingScorePercent: 80,
-  trainingMaterialId: null,
-  questions: [
-    {
-      text: 'Что нужно сделать при обнаружении пожара?',
-      type: 'SingleChoice',
-      options: [
-        { text: 'Сообщить руководителю и вызвать пожарную охрану', isCorrect: true },
-        { text: 'Продолжить работу', isCorrect: false },
-        { text: 'Спрятаться', isCorrect: false }
-      ]
-    }
-  ]
-}, null, 2))
 
 async function load() {
   tests.value = await apiFetch('/api/tests')
   employees.value = await apiFetch('/api/employees/lookup')
-}
-
-async function importFromText() {
-  error.value = ''
-  success.value = ''
-  try {
-    const parsed = JSON.parse(jsonText.value)
-    await apiFetch('/api/tests/import-json', {
-      method: 'POST',
-      body: JSON.stringify(parsed)
-    })
-    success.value = 'Тест импортирован'
-    await load()
-  } catch (e) {
-    error.value = e.message
-  }
 }
 
 async function importFromFile(event) {
