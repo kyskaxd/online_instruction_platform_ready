@@ -8,7 +8,15 @@
       <label>Фамилия<input v-model="form.lastName" required></label>
       <label>Имя<input v-model="form.firstName" required></label>
       <label>Отчество<input v-model="form.middleName"></label>
-      <label>Отдел<input v-model="form.department" required></label>
+      <label>
+        Отдел
+        <select v-model.number="form.departmentId" required>
+          <option value="0" disabled>Выберите отдел</option>
+          <option v-for="department in departments" :key="department.id" :value="department.id">
+            {{ department.name }}
+          </option>
+        </select>
+      </label>
       <label>Должность<input v-model="form.position" required></label>
       <label>Email<input v-model="form.email" type="email" required></label>
       <label>Дата найма<input v-model="form.hireDate" type="date"></label>
@@ -17,8 +25,8 @@
         Роль
         <select v-model="form.role">
           <option value="Employee">Сотрудник</option>
-          <option value="Manager">Менеджер</option>
-          <option value="Admin">Админ</option>
+          <option value="Manager" v-if="isAdmin">Менеджер</option>
+          <option value="HR" v-if="isAdmin">HR</option>
         </select>
       </label>
       <button :disabled="isSaving">Добавить</button>
@@ -28,10 +36,21 @@
   <section class="card">
     <div class="employees-header">
       <h2>Список сотрудников</h2>
-      <label class="search-field">
-        Поиск по имени
-        <input v-model="searchQuery" placeholder="Введите ФИО">
-      </label>
+      <div class="filter-group">
+        <label class="search-field">
+          Поиск по имени
+          <input v-model="searchQuery" placeholder="Введите ФИО">
+        </label>
+        <label class="department-filter">
+          Отдел
+          <select v-model="departmentFilter">
+            <option value="">Все отделы</option>
+            <option v-for="department in departments" :key="department.id" :value="department.name">
+              {{ department.name }}
+            </option>
+          </select>
+        </label>
+      </div>
     </div>
 
     <div v-if="filteredEmployees.length === 0" class="empty-state">
@@ -61,15 +80,19 @@
             <dt>Дата найма</dt>
             <dd>{{ formatDate(employee.hireDate) }}</dd>
           </div>
+          <div>
+            <dt>Статус</dt>
+            <dd>{{ employee.isActive ? 'Активен' : 'Неактивен' }}</dd>
+          </div>
         </dl>
 
         <button
           v-if="canDelete(employee)"
-          class="danger"
+          :class="employee.isActive ? 'danger' : 'success'"
           :disabled="deletingId === employee.id"
-          @click="deleteEmployee(employee)"
+          @click="toggleActive(employee)"
         >
-          Удалить
+          {{ employee.isActive ? 'Удалить' : 'Разморозить' }}
         </button>
       </article>
     </div>
@@ -81,6 +104,8 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { apiFetch, getCurrentUser } from '../api'
 
 const employees = ref([])
+const departments = ref([])
+const departmentFilter = ref('')
 const error = ref('')
 const success = ref('')
 const isSaving = ref(false)
@@ -91,7 +116,7 @@ const form = reactive({
   lastName: '',
   firstName: '',
   middleName: '',
-  department: '',
+  departmentId: 0,
   position: '',
   email: '',
   hireDate: '',
@@ -102,14 +127,16 @@ const form = reactive({
 const roleLabels = {
   Admin: 'Админ',
   Manager: 'Менеджер',
-  Employee: 'Сотрудник'
+  Employee: 'Сотрудник',
+  HR: 'HR'
 }
+
+const currentUser = getCurrentUser()
+const isAdmin = computed(() => currentUser?.role === 'Admin')
+const isHR = computed(() => currentUser?.role === 'HR')
 
 const filteredEmployees = computed(() => {
   const query = searchQuery.value.trim().toLowerCase()
-  if (!query) {
-    return employees.value
-  }
 
   return employees.value.filter((employee) => {
     const fullName = [
@@ -118,7 +145,10 @@ const filteredEmployees = computed(() => {
       employee.middleName
     ].filter(Boolean).join(' ').toLowerCase()
 
-    return fullName.includes(query)
+    const matchesQuery = !query || fullName.includes(query)
+    const matchesDepartment = !departmentFilter.value || employee.department === departmentFilter.value
+
+    return matchesQuery && matchesDepartment
   })
 })
 
@@ -134,14 +164,17 @@ async function createEmployee() {
   try {
     await apiFetch('/api/employees', {
       method: 'POST',
-      body: JSON.stringify({ ...form, hireDate: form.hireDate || null })
+      body: JSON.stringify({
+        ...form,
+        hireDate: form.hireDate || null
+      })
     })
     success.value = 'Сотрудник создан'
     Object.assign(form, {
       lastName: '',
       firstName: '',
       middleName: '',
-      department: '',
+      departmentId: 0,
       position: '',
       email: '',
       hireDate: '',
@@ -156,8 +189,13 @@ async function createEmployee() {
   }
 }
 
-async function deleteEmployee(employee) {
-  if (!confirm(`Удалить сотрудника ${employee.lastName} ${employee.firstName}?`)) {
+async function loadDepartments() {
+  departments.value = await apiFetch('/api/departments')
+}
+
+async function toggleActive(employee) {
+  const action = employee.isActive ? 'Удалить' : 'Разморозить'
+  if (!confirm(`${action} сотрудника ${employee.lastName} ${employee.firstName}?`)) {
     return
   }
 
@@ -166,8 +204,13 @@ async function deleteEmployee(employee) {
   deletingId.value = employee.id
 
   try {
-    await apiFetch(`/api/employees/${employee.id}`, { method: 'DELETE' })
-    success.value = 'Сотрудник удалён'
+    if (employee.isActive) {
+      await apiFetch(`/api/employees/${employee.id}`, { method: 'DELETE' })
+      success.value = 'Сотрудник заблокирован'
+    } else {
+      await apiFetch(`/api/employees/${employee.id}/activate`, { method: 'POST' })
+      success.value = 'Сотрудник разморожен'
+    }
     await loadEmployees()
   } catch (e) {
     error.value = e.message
@@ -178,11 +221,15 @@ async function deleteEmployee(employee) {
 
 function canDelete(employee) {
   const currentUser = getCurrentUser()
-  return currentUser?.role === 'Admin' && currentUser.employeeId !== employee.id
+  return (currentUser?.role === 'Admin' || currentUser?.role === 'HR') && currentUser.employeeId !== employee.id
 }
 
 function roleLabel(role) {
   return roleLabels[role] || role
+}
+
+function buttonClass(employee) {
+  return employee.isActive ? 'danger' : 'success'
 }
 
 function formatDate(value) {
@@ -193,7 +240,9 @@ function formatDate(value) {
   return new Date(value).toLocaleDateString('ru-RU')
 }
 
-onMounted(loadEmployees)
+onMounted(async () => {
+  await Promise.all([loadEmployees(), loadDepartments()])
+})
 </script>
 
 <style scoped>

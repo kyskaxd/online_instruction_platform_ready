@@ -36,7 +36,8 @@ async function login() {
   try {
     const response = await apiFetch('/api/auth/login', {
       method: 'POST',
-      body: JSON.stringify(form)
+      body: JSON.stringify(form),
+      redirectOnUnauthorized: false
     })
     setSession(response)
     router.push('/')

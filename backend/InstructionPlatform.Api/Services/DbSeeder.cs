@@ -14,11 +14,20 @@ public class DbSeeder(AppDbContext db, PasswordHashService passwordHashService)
             return;
         }
 
+        var administrationDepartment = await db.Departments.FirstOrDefaultAsync(x => x.Name == "Administration");
+        if (administrationDepartment is null)
+        {
+            administrationDepartment = new Department { Name = "Administration" };
+            db.Departments.Add(administrationDepartment);
+            await db.SaveChangesAsync();
+        }
+
         var admin = new Employee
         {
             LastName = "System",
             FirstName = "Admin",
-            Department = "Administration",
+            Department = administrationDepartment.Name,
+            DepartmentId = administrationDepartment.Id,
             Position = "Administrator",
             Email = "admin@local.test",
             PasswordHash = passwordHashService.Hash("Admin123!"),

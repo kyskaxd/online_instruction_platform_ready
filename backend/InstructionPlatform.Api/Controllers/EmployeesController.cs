@@ -14,14 +14,21 @@ namespace InstructionPlatform.Api.Controllers;
 [Authorize]
 public class EmployeesController(AppDbContext db, PasswordHashService passwordHashService) : ControllerBase
 {
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "Admin,HR")]
     [HttpGet]
-    public async Task<ActionResult<List<EmployeeDto>>> GetAll()
+    public async Task<ActionResult<List<EmployeeDto>>> GetAll(int? departmentId = null)
     {
-        var employees = await db.Employees
-            .AsNoTracking()
-            .Where(x => x.IsActive)
-            .OrderBy(x => x.Department)
+        var employeesQuery = db.Employees.AsNoTracking()
+            .Where(x => x.Role != UserRole.Admin);
+
+        if (departmentId.HasValue)
+        {
+            employeesQuery = employeesQuery.Where(x => x.DepartmentId == departmentId.Value);
+        }
+
+        var employees = await employeesQuery
+            .OrderByDescending(x => x.IsActive)
+            .ThenBy(x => x.Department)
             .ThenBy(x => x.Position)
             .ThenBy(x => x.LastName)
             .Select(x => ToDto(x))
@@ -51,7 +58,7 @@ public class EmployeesController(AppDbContext db, PasswordHashService passwordHa
         return Ok(employees);
     }
 
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "Admin,HR")]
     [HttpGet("{id:int}")]
     public async Task<ActionResult<EmployeeDto>> GetById(int id)
     {
@@ -72,7 +79,7 @@ public class EmployeesController(AppDbContext db, PasswordHashService passwordHa
         return employee is null ? NotFound() : Ok(ToDto(employee));
     }
 
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "Admin,HR")]
     [HttpPost]
     public async Task<ActionResult<EmployeeDto>> Create(CreateEmployeeRequest request)
     {
@@ -81,7 +88,7 @@ public class EmployeesController(AppDbContext db, PasswordHashService passwordHa
             return BadRequest("Фамилия и имя обязательны.");
         }
 
-        if (string.IsNullOrWhiteSpace(request.Department) || string.IsNullOrWhiteSpace(request.Position))
+        if (request.DepartmentId <= 0 || string.IsNullOrWhiteSpace(request.Position))
         {
             return BadRequest("Отдел и должность обязательны.");
         }
@@ -96,6 +103,17 @@ public class EmployeesController(AppDbContext db, PasswordHashService passwordHa
             return Forbid();
         }
 
+        if (request.Role == UserRole.Admin)
+        {
+            return BadRequest("Создание второго администратора запрещено.");
+        }
+
+        var department = await db.Departments.FindAsync(request.DepartmentId);
+        if (department is null)
+        {
+            return BadRequest("Выбранный отдел не существует.");
+        }
+
         var emailExists = await db.Employees.AnyAsync(x => x.Email.ToLower() == request.Email.ToLower());
         if (emailExists)
         {
@@ -107,7 +125,8 @@ public class EmployeesController(AppDbContext db, PasswordHashService passwordHa
             LastName = request.LastName.Trim(),
             FirstName = request.FirstName.Trim(),
             MiddleName = request.MiddleName?.Trim(),
-            Department = request.Department.Trim(),
+            Department = department.Name,
+            DepartmentId = department.Id,
             Position = request.Position.Trim(),
             Email = request.Email.Trim(),
             PasswordHash = passwordHashService.Hash(request.Password),
@@ -122,7 +141,7 @@ public class EmployeesController(AppDbContext db, PasswordHashService passwordHa
         return CreatedAtAction(nameof(GetById), new { id = employee.Id }, ToDto(employee));
     }
 
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "Admin,HR")]
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> Delete(int id)
     {
@@ -138,56 +157,44 @@ public class EmployeesController(AppDbContext db, PasswordHashService passwordHa
             return NotFound();
         }
 
-        await using var transaction = await db.Database.BeginTransactionAsync();
-
-        var attemptIds = await db.TestAttempts
-            .Where(x => x.EmployeeId == id)
-            .Select(x => x.Id)
-            .ToListAsync();
-
-        var attemptAnswers = await db.TestAttemptAnswers
-            .Where(x => attemptIds.Contains(x.TestAttemptId))
-            .ToListAsync();
-        db.TestAttemptAnswers.RemoveRange(attemptAnswers);
-
-        var attempts = await db.TestAttempts
-            .Where(x => x.EmployeeId == id)
-            .ToListAsync();
-        db.TestAttempts.RemoveRange(attempts);
-
-        var assignments = await db.TestAssignments
-            .Where(x => x.EmployeeId == id)
-            .ToListAsync();
-        db.TestAssignments.RemoveRange(assignments);
-
-        var assignedByEmployee = await db.TestAssignments
-            .Where(x => x.AssignedByUserId == id)
-            .ToListAsync();
-        foreach (var assignment in assignedByEmployee)
+        if (employee.Role == UserRole.Admin)
         {
-            assignment.AssignedByUserId = currentUserId;
+            return BadRequest("Нельзя удалить администратора.");
         }
 
-        var createdTests = await db.Tests
-            .Where(x => x.CreatedByUserId == id)
-            .ToListAsync();
-        foreach (var test in createdTests)
+        if (!employee.IsActive)
         {
-            test.CreatedByUserId = currentUserId;
+            return BadRequest("Сотрудник уже неактивен.");
         }
 
-        var uploadedMaterials = await db.TrainingMaterials
-            .Where(x => x.UploadedByUserId == id)
-            .ToListAsync();
-        foreach (var material in uploadedMaterials)
-        {
-            material.UploadedByUserId = currentUserId;
-        }
-
-        db.Employees.Remove(employee);
-
+        employee.IsActive = false;
         await db.SaveChangesAsync();
-        await transaction.CommitAsync();
+
+        return NoContent();
+    }
+
+    [Authorize(Roles = "Admin,HR")]
+    [HttpPost("{id:int}/activate")]
+    public async Task<IActionResult> Activate(int id)
+    {
+        var employee = await db.Employees.FirstOrDefaultAsync(x => x.Id == id);
+        if (employee is null)
+        {
+            return NotFound();
+        }
+
+        if (employee.Role == UserRole.Admin)
+        {
+            return BadRequest("Нельзя изменять статус администратора.");
+        }
+
+        if (employee.IsActive)
+        {
+            return BadRequest("Сотрудник уже активен.");
+        }
+
+        employee.IsActive = true;
+        await db.SaveChangesAsync();
 
         return NoContent();
     }

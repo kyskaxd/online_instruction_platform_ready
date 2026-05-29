@@ -1,5 +1,6 @@
 using InstructionPlatform.Api.Data;
 using InstructionPlatform.Api.Domain.Entities;
+using InstructionPlatform.Api.Domain.Enums;
 using InstructionPlatform.Api.Dtos;
 using InstructionPlatform.Api.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -57,12 +58,24 @@ public class AuthController(
             return Conflict("Пользователь с таким email уже существует.");
         }
 
+        if (request.Role == UserRole.Admin)
+        {
+            return BadRequest("Создание второго администратора запрещено.");
+        }
+
+        var department = await db.Departments.FindAsync(request.DepartmentId);
+        if (department is null)
+        {
+            return BadRequest("Выбранный отдел не существует.");
+        }
+
         var user = new Employee
         {
             LastName = request.LastName.Trim(),
             FirstName = request.FirstName.Trim(),
             MiddleName = request.MiddleName?.Trim(),
-            Department = request.Department.Trim(),
+            Department = department.Name,
+            DepartmentId = department.Id,
             Position = request.Position.Trim(),
             Email = request.Email.Trim(),
             PasswordHash = passwordHashService.Hash(request.Password),

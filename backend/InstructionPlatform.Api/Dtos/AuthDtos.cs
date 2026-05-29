@@ -8,7 +8,7 @@ public record RegisterUserRequest(
     string LastName,
     string FirstName,
     string? MiddleName,
-    string Department,
+    int DepartmentId,
     string Position,
     string Email,
     string Password,

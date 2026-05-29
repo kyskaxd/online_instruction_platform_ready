@@ -12,8 +12,8 @@ import ReportsView from '../views/ReportsView.vue'
 const routes = [
   { path: '/', name: 'dashboard', component: DashboardView, meta: { requiresAuth: true } },
   { path: '/login', name: 'login', component: LoginView },
-  { path: '/employees', name: 'employees', component: EmployeesView, meta: { requiresAuth: true, roles: ['Admin'] } },
-  { path: '/materials', name: 'materials', component: MaterialsView, meta: { requiresAuth: true } },
+  { path: '/employees', name: 'employees', component: EmployeesView, meta: { requiresAuth: true, roles: ['Admin', 'HR'] } },
+  { path: '/materials', name: 'materials', component: MaterialsView, meta: { requiresAuth: true, roles: ['Admin', 'Manager', 'Employee'] } },
   { path: '/tests/import', name: 'test-import', component: TestImportView, meta: { requiresAuth: true, roles: ['Admin', 'Manager'] } },
   { path: '/my-tests', name: 'my-tests', component: MyTestsView, meta: { requiresAuth: true, roles: ['Employee'] } },
   { path: '/tests/:id/take', name: 'test-passing', component: TestPassingView, meta: { requiresAuth: true, roles: ['Employee'] } },

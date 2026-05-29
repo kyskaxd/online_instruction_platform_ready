@@ -26,6 +26,9 @@ public class Employee
     [MaxLength(150)]
     public string Department { get; set; } = string.Empty;
 
+    public int DepartmentId { get; set; }
+    public Department? DepartmentRef { get; set; }
+
     [Required]
     [MaxLength(150)]
     public string Position { get; set; } = string.Empty;

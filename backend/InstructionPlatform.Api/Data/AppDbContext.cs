@@ -14,6 +14,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<TestAssignment> TestAssignments => Set<TestAssignment>();
     public DbSet<TestAttempt> TestAttempts => Set<TestAttempt>();
     public DbSet<TestAttemptAnswer> TestAttemptAnswers => Set<TestAttemptAnswer>();
+    public DbSet<Department> Departments => Set<Department>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -22,6 +23,17 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         modelBuilder.Entity<Employee>(entity =>
         {
             entity.Property(x => x.Role).HasConversion<string>().HasMaxLength(30);
+            entity.HasOne(x => x.DepartmentRef)
+                .WithMany(x => x.Employees)
+                .HasForeignKey(x => x.DepartmentId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<Department>(entity =>
+        {
+            entity.ToTable("departments");
+            entity.HasIndex(x => x.Name).IsUnique();
+            entity.Property(x => x.Name).HasMaxLength(150).IsRequired();
         });
 
         modelBuilder.Entity<TrainingMaterial>(entity =>
