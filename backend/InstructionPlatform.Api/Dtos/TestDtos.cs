@@ -15,6 +15,7 @@ public class TestQuestionImportDto
 {
     public string Text { get; set; } = string.Empty;
     public QuestionType Type { get; set; } = QuestionType.SingleChoice;
+    public string? ExpectedAnswer { get; set; }
     public List<TestAnswerOptionImportDto> Options { get; set; } = [];
 }
 
@@ -33,7 +34,7 @@ public record TestListDto(
     DateTime CreatedAt,
     int? TrainingMaterialId);
 
-public record AssignTestRequest(List<int> EmployeeIds, DateTime? Deadline);
+public record AssignTestRequest(List<int>? EmployeeIds, List<int>? DepartmentIds, DateTime? Deadline);
 
 public record MyTestAssignmentDto(
     int AssignmentId,
@@ -72,6 +73,7 @@ public class SubmittedQuestionAnswerDto
 {
     public int QuestionId { get; set; }
     public List<int> OptionIds { get; set; } = [];
+    public string? AnswerText { get; set; }
 }
 
 public record SubmitTestResponse(

@@ -63,31 +63,6 @@ public class TestsController(AppDbContext db) : ControllerBase
     }
 
     [Authorize(Roles = "Admin,Manager")]
-    [HttpPost("import-file")]
-    [RequestSizeLimit(10_000_000)]
-    public async Task<ActionResult<TestListDto>> ImportFile(IFormFile file)
-    {
-        if (file.Length == 0 || Path.GetExtension(file.FileName).ToLowerInvariant() != ".json")
-        {
-            return BadRequest("Загрузите JSON-файл с тестом.");
-        }
-
-        await using var stream = file.OpenReadStream();
-        var request = await JsonSerializer.DeserializeAsync<TestImportRequest>(stream, new JsonSerializerOptions
-        {
-            PropertyNameCaseInsensitive = true,
-            Converters = { new JsonStringEnumConverter() }
-        });
-
-        if (request is null)
-        {
-            return BadRequest("Не удалось прочитать JSON.");
-        }
-
-        return await ImportJson(request);
-    }
-
-    [Authorize(Roles = "Admin,Manager")]
     [HttpPost("{testId:int}/assign")]
     public async Task<IActionResult> Assign(int testId, AssignTestRequest request)
     {
@@ -97,12 +72,41 @@ public class TestsController(AppDbContext db) : ControllerBase
             return NotFound("Тест не найден.");
         }
 
-        if (request.EmployeeIds.Count == 0)
+        var departmentIds = request.DepartmentIds ?? new List<int>();
+        var employeeIds = request.EmployeeIds?.Distinct().ToList() ?? new List<int>();
+
+        if (departmentIds.Count == 0 && employeeIds.Count == 0)
         {
-            return BadRequest("Выберите хотя бы одного сотрудника.");
+            return BadRequest("Выберите отделы для назначения.");
         }
 
-        var employeeIds = request.EmployeeIds.Distinct().ToList();
+        if (departmentIds.Count > 0)
+        {
+            var validDepartmentIds = await db.Departments
+                .Where(x => departmentIds.Contains(x.Id))
+                .Select(x => x.Id)
+                .ToListAsync();
+
+            var notFoundDepartmentIds = departmentIds.Except(validDepartmentIds).ToList();
+            if (notFoundDepartmentIds.Count > 0)
+            {
+                return BadRequest($"Отделы не найдены: {string.Join(", ", notFoundDepartmentIds)}");
+            }
+
+            var departmentEmployeeIds = await db.Employees
+                .Where(x => validDepartmentIds.Contains(x.DepartmentId) && x.IsActive)
+                .Select(x => x.Id)
+                .ToListAsync();
+
+            employeeIds.AddRange(departmentEmployeeIds);
+        }
+
+        employeeIds = employeeIds.Distinct().ToList();
+        if (employeeIds.Count == 0)
+        {
+            return BadRequest("Сотрудники для назначения не найдены.");
+        }
+
         var existingEmployeeIds = await db.Employees
             .Where(x => employeeIds.Contains(x.Id))
             .Select(x => x.Id)
@@ -239,7 +243,7 @@ public class TestsController(AppDbContext db) : ControllerBase
         }
 
         var assignment = await db.TestAssignments
-            .Include(x => x.Test)!
+            .Include(x => x.Test!)
             .ThenInclude(x => x.Questions)
             .ThenInclude(x => x.Options)
             .FirstOrDefaultAsync(x => x.TestId == testId && x.EmployeeId == employeeId.Value);
@@ -288,7 +292,7 @@ public class TestsController(AppDbContext db) : ControllerBase
         }
 
         var assignment = await db.TestAssignments
-            .Include(x => x.Test)!
+            .Include(x => x.Test!)
             .ThenInclude(x => x.Questions)
             .ThenInclude(x => x.Options)
             .FirstOrDefaultAsync(x => x.TestId == testId && x.EmployeeId == employeeId.Value);
@@ -305,19 +309,35 @@ public class TestsController(AppDbContext db) : ControllerBase
             return BadRequest("В тесте нет вопросов.");
         }
 
-        var submittedByQuestion = request.Answers.ToDictionary(x => x.QuestionId, x => x.OptionIds.Distinct().OrderBy(id => id).ToList());
+        var submittedByQuestion = request.Answers?.ToDictionary(x => x.QuestionId) ?? new Dictionary<int, SubmittedQuestionAnswerDto>();
         var correctCount = 0;
 
         foreach (var question in questions)
         {
+            if (question.Type == QuestionType.Text)
+            {
+                submittedByQuestion.TryGetValue(question.Id, out var submittedTextAnswer);
+                var submittedText = submittedTextAnswer?.AnswerText?.Trim();
+                var expectedText = question.ExpectedAnswer?.Trim();
+
+                if (!string.IsNullOrWhiteSpace(expectedText)
+                    && !string.IsNullOrWhiteSpace(submittedText)
+                    && string.Equals(expectedText, submittedText, StringComparison.OrdinalIgnoreCase))
+                {
+                    correctCount++;
+                }
+
+                continue;
+            }
+
             var correctOptionIds = question.Options
                 .Where(o => o.IsCorrect)
                 .Select(o => o.Id)
                 .OrderBy(id => id)
                 .ToList();
 
-            submittedByQuestion.TryGetValue(question.Id, out var submittedOptionIds);
-            submittedOptionIds ??= [];
+            submittedByQuestion.TryGetValue(question.Id, out var submittedOptionAnswer);
+            var submittedOptionIds = submittedOptionAnswer?.OptionIds?.Distinct().OrderBy(id => id).ToList() ?? [];
 
             if (correctOptionIds.SequenceEqual(submittedOptionIds))
             {
@@ -339,11 +359,31 @@ public class TestsController(AppDbContext db) : ControllerBase
             IsPassed = isPassed
         };
 
-        foreach (var answer in request.Answers)
+        foreach (var answer in request.Answers ?? [])
         {
-            var validOptionIds = questions
-                .Where(q => q.Id == answer.QuestionId)
-                .SelectMany(q => q.Options.Select(o => o.Id))
+            var question = questions.FirstOrDefault(q => q.Id == answer.QuestionId);
+            if (question is null)
+            {
+                continue;
+            }
+
+            if (question.Type == QuestionType.Text)
+            {
+                var answerText = answer.AnswerText?.Trim();
+                if (!string.IsNullOrWhiteSpace(answerText))
+                {
+                    attempt.Answers.Add(new TestAttemptAnswer
+                    {
+                        TestQuestionId = answer.QuestionId,
+                        AnswerText = answerText
+                    });
+                }
+
+                continue;
+            }
+
+            var validOptionIds = question.Options
+                .Select(o => o.Id)
                 .ToHashSet();
 
             foreach (var optionId in answer.OptionIds.Distinct().Where(validOptionIds.Contains))
@@ -397,6 +437,21 @@ public class TestsController(AppDbContext db) : ControllerBase
                 return $"Вопрос #{i + 1}: текст обязателен.";
             }
 
+            if (question.Type == QuestionType.Text)
+            {
+                if (string.IsNullOrWhiteSpace(question.ExpectedAnswer))
+                {
+                    return $"Вопрос #{i + 1}: для текстового вопроса укажите правильный ответ.";
+                }
+
+                if (question.Options.Count > 0)
+                {
+                    return $"Вопрос #{i + 1}: текстовый вопрос не должен содержать вариантов ответа.";
+                }
+
+                continue;
+            }
+
             if (question.Options.Count < 2)
             {
                 return $"Вопрос #{i + 1}: нужно минимум 2 варианта ответа.";
@@ -437,18 +492,24 @@ public class TestsController(AppDbContext db) : ControllerBase
             {
                 Text = questionRequest.Text.Trim(),
                 Type = questionRequest.Type,
+                ExpectedAnswer = questionRequest.Type == QuestionType.Text
+                    ? questionRequest.ExpectedAnswer?.Trim()
+                    : null,
                 SortOrder = questionIndex + 1
             };
 
-            for (var optionIndex = 0; optionIndex < questionRequest.Options.Count; optionIndex++)
+            if (questionRequest.Type != QuestionType.Text)
             {
-                var optionRequest = questionRequest.Options[optionIndex];
-                question.Options.Add(new TestAnswerOption
+                for (var optionIndex = 0; optionIndex < questionRequest.Options.Count; optionIndex++)
                 {
-                    Text = optionRequest.Text.Trim(),
-                    IsCorrect = optionRequest.IsCorrect,
-                    SortOrder = optionIndex + 1
-                });
+                    var optionRequest = questionRequest.Options[optionIndex];
+                    question.Options.Add(new TestAnswerOption
+                    {
+                        Text = optionRequest.Text.Trim(),
+                        IsCorrect = optionRequest.IsCorrect,
+                        SortOrder = optionIndex + 1
+                    });
+                }
             }
 
             test.Questions.Add(question);

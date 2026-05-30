@@ -12,7 +12,13 @@
     <form @submit.prevent="submit">
       <article v-for="question in test.questions" :key="question.id" class="question">
         <h3>{{ question.text }}</h3>
-        <div class="options">
+
+        <div v-if="question.type === 'Text'" class="field-row">
+          <label>Ваш ответ</label>
+          <textarea v-model="answers[question.id]" rows="3" required></textarea>
+        </div>
+
+        <div v-else class="options">
           <label v-for="option in question.options" :key="option.id" class="option-row">
             <input
               v-if="question.type === 'SingleChoice'"
@@ -20,13 +26,13 @@
               :name="`q-${question.id}`"
               :value="option.id"
               v-model="answers[question.id]"
-            >
+            />
             <input
               v-else
               type="checkbox"
               :value="option.id"
               v-model="answers[question.id]"
-            >
+            />
             {{ option.text }}
           </label>
         </div>
@@ -52,7 +58,7 @@ async function load() {
   try {
     test.value = await apiFetch(`/api/tests/${route.params.id}/take`)
     for (const question of test.value.questions) {
-      answers[question.id] = question.type === 'SingleChoice' ? null : []
+      answers[question.id] = question.type === 'SingleChoice' ? null : question.type === 'Text' ? '' : []
     }
   } catch (e) {
     error.value = e.message
@@ -67,9 +73,13 @@ async function submit() {
         questionId: question.id,
         optionIds: question.type === 'SingleChoice'
           ? (answers[question.id] ? [answers[question.id]] : [])
-          : answers[question.id]
+          : question.type === 'MultipleChoice'
+            ? answers[question.id]
+            : [],
+        answerText: question.type === 'Text' ? answers[question.id] : null
       }))
     }
+
     result.value = await apiFetch(`/api/tests/${route.params.id}/submit`, {
       method: 'POST',
       body: JSON.stringify(payload)

@@ -13,6 +13,7 @@ public class TestAttemptAnswer
     public int TestQuestionId { get; set; }
     public TestQuestion? Question { get; set; }
 
-    public int TestAnswerOptionId { get; set; }
+    public int? TestAnswerOptionId { get; set; }
     public TestAnswerOption? AnswerOption { get; set; }
+    public string? AnswerText { get; set; }
 }

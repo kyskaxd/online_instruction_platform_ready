@@ -45,7 +45,7 @@
           Отдел
           <select v-model="departmentFilter">
             <option value="">Все отделы</option>
-            <option v-for="department in departments" :key="department.id" :value="department.name">
+            <option v-for="department in departmentsForFilter" :key="department.id" :value="department.name">
               {{ department.name }}
             </option>
           </select>
@@ -151,6 +151,8 @@ const filteredEmployees = computed(() => {
     return matchesQuery && matchesDepartment
   })
 })
+
+const departmentsForFilter = computed(() => departments.value.filter(d => d.name !== 'Administration'))
 
 async function loadEmployees() {
   employees.value = await apiFetch('/api/employees')

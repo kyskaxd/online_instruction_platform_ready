@@ -14,6 +14,7 @@ public class TestQuestion
     [Required]
     public string Text { get; set; } = string.Empty;
     public QuestionType Type { get; set; } = QuestionType.SingleChoice;
+    public string? ExpectedAnswer { get; set; }
     public int SortOrder { get; set; }
 
     public ICollection<TestAnswerOption> Options { get; set; } = new List<TestAnswerOption>();
