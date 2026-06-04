@@ -1,12 +1,10 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
-using Microsoft.EntityFrameworkCore;
 
 namespace InstructionPlatform.Api.Domain.Entities;
 
-[Table("departments")]
-[Index(nameof(Name), IsUnique = true)]
-public class Department
+[Table("positions")]
+public class Position
 {
     public int Id { get; set; }
 
@@ -14,8 +12,12 @@ public class Department
     [MaxLength(150)]
     public string Name { get; set; } = string.Empty;
 
+    [Required]
+    public int DepartmentId { get; set; }
+
+    public Department? Department { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     public ICollection<Employee> Employees { get; set; } = new List<Employee>();
-    public ICollection<Position> Positions { get; set; } = new List<Position>();
 }

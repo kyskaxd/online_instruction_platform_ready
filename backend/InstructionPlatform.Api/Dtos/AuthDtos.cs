@@ -9,7 +9,7 @@ public record RegisterUserRequest(
     string FirstName,
     string? MiddleName,
     int DepartmentId,
-    string Position,
+    int PositionId,
     string Email,
     string Password,
     UserRole Role,

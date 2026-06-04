@@ -44,10 +44,11 @@
 
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { apiFetch } from '../api'
 
 const route = useRoute()
+const router = useRouter()
 const test = ref(null)
 const result = ref(null)
 const error = ref('')
@@ -84,6 +85,7 @@ async function submit() {
       method: 'POST',
       body: JSON.stringify(payload)
     })
+    router.push('/my-tests')
   } catch (e) {
     error.value = e.message
   }

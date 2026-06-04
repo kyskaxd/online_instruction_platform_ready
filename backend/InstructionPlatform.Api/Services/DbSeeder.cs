@@ -22,13 +22,21 @@ public class DbSeeder(AppDbContext db, PasswordHashService passwordHashService)
             await db.SaveChangesAsync();
         }
 
+        var administratorPosition = await db.Positions.FirstOrDefaultAsync(x => x.Name == "Administrator" && x.DepartmentId == administrationDepartment.Id);
+        if (administratorPosition is null)
+        {
+            administratorPosition = new Position { Name = "Administrator", DepartmentId = administrationDepartment.Id };
+            db.Positions.Add(administratorPosition);
+            await db.SaveChangesAsync();
+        }
+
         var admin = new Employee
         {
             LastName = "System",
             FirstName = "Admin",
             Department = administrationDepartment.Name,
             DepartmentId = administrationDepartment.Id,
-            Position = "Administrator",
+            PositionId = administratorPosition.Id,
             Email = "admin@local.test",
             PasswordHash = passwordHashService.Hash("Admin123!"),
             Role = UserRole.Admin,

@@ -69,6 +69,17 @@ public class AuthController(
             return BadRequest("Выбранный отдел не существует.");
         }
 
+        var position = await db.Positions.FindAsync(request.PositionId);
+        if (position is null)
+        {
+            return BadRequest("Выбранная должность не существует.");
+        }
+
+        if (position.DepartmentId != department.Id)
+        {
+            return BadRequest("Выбранная должность не принадлежит выбранному отделу.");
+        }
+
         var user = new Employee
         {
             LastName = request.LastName.Trim(),
@@ -76,7 +87,7 @@ public class AuthController(
             MiddleName = request.MiddleName?.Trim(),
             Department = department.Name,
             DepartmentId = department.Id,
-            Position = request.Position.Trim(),
+            PositionId = position.Id,
             Email = request.Email.Trim(),
             PasswordHash = passwordHashService.Hash(request.Password),
             Role = request.Role,
@@ -118,7 +129,7 @@ public class AuthController(
         {
             HttpOnly = true,
             Secure = !environment.IsDevelopment(),
-            SameSite = SameSiteMode.Lax,
+            SameSite = environment.IsDevelopment() ? SameSiteMode.Lax : SameSiteMode.None,
             Path = "/",
             Expires = DateTimeOffset.UtcNow.AddHours(12)
         });

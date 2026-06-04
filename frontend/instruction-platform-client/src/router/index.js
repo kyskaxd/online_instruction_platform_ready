@@ -5,6 +5,7 @@ import LoginView from '../views/LoginView.vue'
 import EmployeesView from '../views/EmployeesView.vue'
 import MaterialsView from '../views/MaterialsView.vue'
 import TestImportView from '../views/TestImportView.vue'
+import TestCreateView from '../views/TestCreateView.vue'
 import MyTestsView from '../views/MyTestsView.vue'
 import TestPassingView from '../views/TestPassingView.vue'
 import ReportsView from '../views/ReportsView.vue'
@@ -15,6 +16,8 @@ const routes = [
   { path: '/employees', name: 'employees', component: EmployeesView, meta: { requiresAuth: true, roles: ['Admin', 'HR'] } },
   { path: '/materials', name: 'materials', component: MaterialsView, meta: { requiresAuth: true, roles: ['Admin', 'Manager', 'Employee'] } },
   { path: '/tests/import', name: 'test-import', component: TestImportView, meta: { requiresAuth: true, roles: ['Admin', 'Manager'] } },
+  { path: '/tests/create', name: 'test-create', component: TestCreateView, meta: { requiresAuth: true, roles: ['Admin', 'Manager'] } },
+  { path: '/tests/:id/edit', name: 'test-edit', component: TestCreateView, meta: { requiresAuth: true, roles: ['Admin', 'Manager'] } },
   { path: '/my-tests', name: 'my-tests', component: MyTestsView, meta: { requiresAuth: true, roles: ['Employee'] } },
   { path: '/tests/:id/take', name: 'test-passing', component: TestPassingView, meta: { requiresAuth: true, roles: ['Employee'] } },
   { path: '/reports', name: 'reports', component: ReportsView, meta: { requiresAuth: true, roles: ['Admin', 'Manager'] } }

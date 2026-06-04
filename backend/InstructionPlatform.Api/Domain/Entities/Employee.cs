@@ -30,8 +30,8 @@ public class Employee
     public Department? DepartmentRef { get; set; }
 
     [Required]
-    [MaxLength(150)]
-    public string Position { get; set; } = string.Empty;
+    public int PositionId { get; set; }
+    public Position? PositionRef { get; set; }
 
     [Required]
     [MaxLength(255)]

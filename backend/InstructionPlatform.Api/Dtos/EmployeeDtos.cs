@@ -27,7 +27,7 @@ public record CreateEmployeeRequest(
     string FirstName,
     string? MiddleName,
     int DepartmentId,
-    string Position,
+    int PositionId,
     string Email,
     DateTime? HireDate,
     string? Password,

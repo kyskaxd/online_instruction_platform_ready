@@ -62,7 +62,7 @@ export async function apiFetch(url, options = {}) {
     if (redirectOnUnauthorized) {
       window.location.href = '/login'
     }
-    throw new Error('Необходимо войти заново')
+    throw new Error('Неверный email или пароль')
   }
 
   if (!response.ok) {

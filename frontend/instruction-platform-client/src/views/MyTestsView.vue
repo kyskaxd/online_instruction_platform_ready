@@ -9,6 +9,7 @@
           <th>Статус</th>
           <th>Балл</th>
           <th>Назначен</th>
+          <th>Попытки</th>
           <th></th>
         </tr>
       </thead>
@@ -18,7 +19,15 @@
           <td><span :class="['status-text', statusClass(item.status)]">{{ statusLabel(item.status) }}</span></td>
           <td>{{ item.lastScorePercent ?? '-' }}</td>
           <td>{{ new Date(item.assignedAt).toLocaleString() }}</td>
-          <td><router-link :to="`/tests/${item.testId}/take`">Пройти</router-link></td>
+          <td>{{ 2 - item.attemptCount }}/2</td>
+          <td>
+            <template v-if="item.attemptCount < 2">
+              <router-link :to="`/tests/${item.testId}/take`">Пройти</router-link>
+            </template>
+            <template v-else>
+              <span>Попытки закончились</span>
+            </template>
+          </td>
         </tr>
       </tbody>
     </table>

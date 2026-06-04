@@ -1,36 +1,73 @@
 <template>
   <section class="card">
-    <h1>Сотрудники</h1>
+    <h1>Управление персоналом</h1>
     <div v-if="error" class="error">{{ error }}</div>
     <div v-if="success" class="success">{{ success }}</div>
 
-    <form @submit.prevent="createEmployee" class="form-grid">
-      <label>Фамилия<input v-model="form.lastName" required></label>
-      <label>Имя<input v-model="form.firstName" required></label>
-      <label>Отчество<input v-model="form.middleName"></label>
-      <label>
-        Отдел
-        <select v-model.number="form.departmentId" required>
-          <option value="0" disabled>Выберите отдел</option>
-          <option v-for="department in departments" :key="department.id" :value="department.id">
-            {{ department.name }}
-          </option>
-        </select>
-      </label>
-      <label>Должность<input v-model="form.position" required></label>
-      <label>Email<input v-model="form.email" type="email" required></label>
-      <label>Дата найма<input v-model="form.hireDate" type="date"></label>
-      <label>Пароль<input v-model="form.password" required></label>
-      <label>
-        Роль
-        <select v-model="form.role">
-          <option value="Employee">Сотрудник</option>
-          <option value="Manager" v-if="isAdmin">Менеджер</option>
-          <option value="HR" v-if="isAdmin">HR</option>
-        </select>
-      </label>
-      <button :disabled="isSaving">Добавить</button>
-    </form>
+    <div class="section-divider">
+      <h2>Добавление отдела</h2>
+      <form @submit.prevent="createDepartment" class="form-grid">
+        <label style="grid-column: 1 / -1;">Название отдела<input v-model="departmentForm.name" required></label>
+        <button style="grid-column: 1 / -1;">Добавить отдел</button>
+      </form>
+    </div>
+
+    <div class="section-divider">
+      <h2>Добавление должности в отдел</h2>
+      <form @submit.prevent="createPosition" class="form-grid">
+        <label>
+          Отдел
+          <select v-model.number="positionForm.departmentId" required>
+            <option value="0" disabled>Выберите отдел</option>
+            <option v-for="department in departments" :key="department.id" :value="department.id">
+              {{ department.name }}
+            </option>
+          </select>
+        </label>
+        <label style="grid-column: 1 / -1;">Название должности<input v-model="positionForm.name" required></label>
+        <button style="grid-column: 1 / -1;" :disabled="isPositionSaving">Добавить должность</button>
+      </form>
+    </div>
+
+    <div class="section-divider">
+      <h2>Добавление сотрудника</h2>
+      <form @submit.prevent="createEmployee" class="form-grid">
+        <label>Фамилия<input v-model="form.lastName" required></label>
+        <label>Имя<input v-model="form.firstName" required></label>
+        <label>Отчество<input v-model="form.middleName"></label>
+        <label>
+          Отдел
+          <select v-model.number="form.departmentId" required>
+            <option value="0" disabled>Выберите отдел</option>
+            <option v-for="department in departments" :key="department.id" :value="department.id">
+              {{ department.name }}
+            </option>
+          </select>
+        </label>
+        <label>
+          Должность
+          <select v-model.number="form.positionId" :disabled="!form.departmentId || positions.length === 0" required>
+            <option value="0" disabled>Выберите должность</option>
+            <option v-for="position in positions" :key="position.id" :value="position.id">
+              {{ position.name }}
+            </option>
+          </select>
+          <small v-if="form.departmentId && positions.length === 0">Нет должностей для этого отдела</small>
+        </label>
+        <label>Email<input v-model="form.email" type="email" required></label>
+        <label>Дата найма<input v-model="form.hireDate" type="date"></label>
+        <label>Пароль<input v-model="form.password" required></label>
+        <label>
+          Роль
+          <select v-model="form.role">
+            <option value="Employee">Сотрудник</option>
+            <option value="Manager" v-if="isAdmin">Менеджер</option>
+            <option value="HR" v-if="isAdmin">HR</option>
+          </select>
+        </label>
+        <button :disabled="isSaving">Добавить</button>
+      </form>
+    </div>
   </section>
 
   <section class="card">
@@ -100,24 +137,35 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { apiFetch, getCurrentUser } from '../api'
 
 const employees = ref([])
 const departments = ref([])
+const positions = ref([])
 const departmentFilter = ref('')
 const error = ref('')
 const success = ref('')
 const isSaving = ref(false)
+const isPositionSaving = ref(false)
 const deletingId = ref(null)
 const searchQuery = ref('')
+
+const departmentForm = reactive({
+  name: ''
+})
+
+const positionForm = reactive({
+  name: '',
+  departmentId: 0
+})
 
 const form = reactive({
   lastName: '',
   firstName: '',
   middleName: '',
   departmentId: 0,
-  position: '',
+  positionId: 0,
   email: '',
   hireDate: '',
   password: '',
@@ -158,6 +206,25 @@ async function loadEmployees() {
   employees.value = await apiFetch('/api/employees')
 }
 
+async function createDepartment() {
+  error.value = ''
+  success.value = ''
+
+  try {
+    await apiFetch('/api/departments', {
+      method: 'POST',
+      body: JSON.stringify({
+        name: departmentForm.name
+      })
+    })
+    success.value = 'Отдел создан'
+    departmentForm.name = ''
+    await loadDepartments()
+  } catch (e) {
+    error.value = e.message
+  }
+}
+
 async function createEmployee() {
   error.value = ''
   success.value = ''
@@ -177,12 +244,13 @@ async function createEmployee() {
       firstName: '',
       middleName: '',
       departmentId: 0,
-      position: '',
+      positionId: 0,
       email: '',
       hireDate: '',
       password: '',
       role: 'Employee'
     })
+    positions.value = []
     await loadEmployees()
   } catch (e) {
     error.value = e.message
@@ -191,9 +259,59 @@ async function createEmployee() {
   }
 }
 
+async function createPosition() {
+  error.value = ''
+  success.value = ''
+  isPositionSaving.value = true
+
+  try {
+    await apiFetch('/api/positions', {
+      method: 'POST',
+      body: JSON.stringify({
+        name: positionForm.name,
+        departmentId: positionForm.departmentId
+      })
+    })
+    success.value = 'Должность создана'
+    positionForm.name = ''
+    positionForm.departmentId = 0
+    await loadDepartments()
+    if (form.departmentId) {
+      await loadPositionsForDepartment(form.departmentId)
+    }
+  } catch (e) {
+    error.value = e.message
+  } finally {
+    isPositionSaving.value = false
+  }
+}
+
 async function loadDepartments() {
   departments.value = await apiFetch('/api/departments')
+  if (form.departmentId) {
+    await loadPositionsForDepartment(form.departmentId)
+  }
 }
+
+async function loadPositionsForDepartment(departmentId) {
+  if (!departmentId) {
+    positions.value = []
+    return
+  }
+
+  positions.value = await apiFetch(`/api/positions/by-department/${departmentId}`)
+}
+
+watch(
+  () => form.departmentId,
+  async (departmentId) => {
+    form.positionId = 0
+    positions.value = []
+    if (departmentId) {
+      await loadPositionsForDepartment(departmentId)
+    }
+  }
+)
 
 async function toggleActive(employee) {
   const action = employee.isActive ? 'Удалить' : 'Разморозить'
@@ -339,5 +457,15 @@ onMounted(async () => {
     align-items: stretch;
     flex-direction: column;
   }
+}
+
+.section-divider {
+  margin-bottom: 32px;
+}
+
+.section-divider h2 {
+  margin: 0 0 16px 0;
+  font-size: 18px;
+  font-weight: 600;
 }
 </style>

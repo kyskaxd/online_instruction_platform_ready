@@ -15,6 +15,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<TestAttempt> TestAttempts => Set<TestAttempt>();
     public DbSet<TestAttemptAnswer> TestAttemptAnswers => Set<TestAttemptAnswer>();
     public DbSet<Department> Departments => Set<Department>();
+    public DbSet<Position> Positions => Set<Position>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -27,12 +28,26 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
                 .WithMany(x => x.Employees)
                 .HasForeignKey(x => x.DepartmentId)
                 .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.PositionRef)
+                .WithMany(x => x.Employees)
+                .HasForeignKey(x => x.PositionId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<Department>(entity =>
         {
             entity.ToTable("departments");
             entity.HasIndex(x => x.Name).IsUnique();
+            entity.Property(x => x.Name).HasMaxLength(150).IsRequired();
+        });
+
+        modelBuilder.Entity<Position>(entity =>
+        {
+            entity.ToTable("positions");
+            entity.HasOne(x => x.Department)
+                .WithMany(x => x.Positions)
+                .HasForeignKey(x => x.DepartmentId)
+                .OnDelete(DeleteBehavior.Cascade);
             entity.Property(x => x.Name).HasMaxLength(150).IsRequired();
         });
 

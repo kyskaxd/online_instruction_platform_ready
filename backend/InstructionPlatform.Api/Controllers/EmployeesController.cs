@@ -19,6 +19,7 @@ public class EmployeesController(AppDbContext db, PasswordHashService passwordHa
     public async Task<ActionResult<List<EmployeeDto>>> GetAll(int? departmentId = null)
     {
         var employeesQuery = db.Employees.AsNoTracking()
+            .Include(x => x.PositionRef)
             .Where(x => x.Role != UserRole.Admin);
 
         if (departmentId.HasValue)
@@ -29,7 +30,7 @@ public class EmployeesController(AppDbContext db, PasswordHashService passwordHa
         var employees = await employeesQuery
             .OrderByDescending(x => x.IsActive)
             .ThenBy(x => x.Department)
-            .ThenBy(x => x.Position)
+            .ThenBy(x => x.PositionRef!.Name)
             .ThenBy(x => x.LastName)
             .Select(x => ToDto(x))
             .ToListAsync();
@@ -43,6 +44,7 @@ public class EmployeesController(AppDbContext db, PasswordHashService passwordHa
     {
         var employees = await db.Employees
             .AsNoTracking()
+            .Include(x => x.PositionRef)
             .Where(x => x.IsActive)
             .OrderBy(x => x.Department)
             .ThenBy(x => x.LastName)
@@ -52,7 +54,7 @@ public class EmployeesController(AppDbContext db, PasswordHashService passwordHa
                 x.FirstName,
                 x.MiddleName,
                 x.Department,
-                x.Position))
+                x.PositionRef!.Name))
             .ToListAsync();
 
         return Ok(employees);
@@ -62,7 +64,9 @@ public class EmployeesController(AppDbContext db, PasswordHashService passwordHa
     [HttpGet("{id:int}")]
     public async Task<ActionResult<EmployeeDto>> GetById(int id)
     {
-        var employee = await db.Employees.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id && x.IsActive);
+        var employee = await db.Employees.AsNoTracking()
+            .Include(x => x.PositionRef)
+            .FirstOrDefaultAsync(x => x.Id == id && x.IsActive);
         return employee is null ? NotFound() : Ok(ToDto(employee));
     }
 
@@ -75,7 +79,10 @@ public class EmployeesController(AppDbContext db, PasswordHashService passwordHa
             return BadRequest("У пользователя не найден профиль сотрудника.");
         }
 
-        var employee = await db.Employees.AsNoTracking().FirstOrDefaultAsync(x => x.Id == employeeId.Value && x.IsActive);
+        var employee = await db.Employees
+            .AsNoTracking()
+            .Include(x => x.PositionRef)
+            .FirstOrDefaultAsync(x => x.Id == employeeId.Value && x.IsActive);
         return employee is null ? NotFound() : Ok(ToDto(employee));
     }
 
@@ -88,7 +95,7 @@ public class EmployeesController(AppDbContext db, PasswordHashService passwordHa
             return BadRequest("Фамилия и имя обязательны.");
         }
 
-        if (request.DepartmentId <= 0 || string.IsNullOrWhiteSpace(request.Position))
+        if (request.DepartmentId <= 0 || request.PositionId <= 0)
         {
             return BadRequest("Отдел и должность обязательны.");
         }
@@ -114,6 +121,17 @@ public class EmployeesController(AppDbContext db, PasswordHashService passwordHa
             return BadRequest("Выбранный отдел не существует.");
         }
 
+        var position = await db.Positions.FindAsync(request.PositionId);
+        if (position is null)
+        {
+            return BadRequest("Выбранная должность не существует.");
+        }
+
+        if (position.DepartmentId != department.Id)
+        {
+            return BadRequest("Выбранная должность не принадлежит выбранному отделу.");
+        }
+
         var emailExists = await db.Employees.AnyAsync(x => x.Email.ToLower() == request.Email.ToLower());
         if (emailExists)
         {
@@ -127,7 +145,7 @@ public class EmployeesController(AppDbContext db, PasswordHashService passwordHa
             MiddleName = request.MiddleName?.Trim(),
             Department = department.Name,
             DepartmentId = department.Id,
-            Position = request.Position.Trim(),
+            PositionId = position.Id,
             Email = request.Email.Trim(),
             PasswordHash = passwordHashService.Hash(request.Password),
             Role = request.Role == 0 ? UserRole.Employee : request.Role,
@@ -137,6 +155,9 @@ public class EmployeesController(AppDbContext db, PasswordHashService passwordHa
 
         db.Employees.Add(employee);
         await db.SaveChangesAsync();
+
+        // Reload to get navigation properties
+        await db.Entry(employee).Reference(x => x.PositionRef).LoadAsync();
 
         return CreatedAtAction(nameof(GetById), new { id = employee.Id }, ToDto(employee));
     }
@@ -220,7 +241,7 @@ public class EmployeesController(AppDbContext db, PasswordHashService passwordHa
         x.FirstName,
         x.MiddleName,
         x.Department,
-        x.Position,
+        x.PositionRef?.Name ?? "Неизвестно",
         x.Email,
         x.HireDate,
         x.Role,

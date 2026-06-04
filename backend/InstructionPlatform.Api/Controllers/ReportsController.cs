@@ -41,7 +41,9 @@ public class ReportsController(AppDbContext db) : ControllerBase
         var assignments = db.TestAssignments
             .AsNoTracking()
             .Include(x => x.Employee)
+            .ThenInclude(x => x!.PositionRef)
             .Include(x => x.Test)
+            .Where(x => x.Employee != null && x.Test != null && x.Employee.PositionRef != null)
             .AsQueryable();
 
         if (testId.HasValue)
@@ -56,24 +58,24 @@ public class ReportsController(AppDbContext db) : ControllerBase
 
         if (!string.IsNullOrWhiteSpace(department))
         {
-            assignments = assignments.Where(x => x.Employee!.Department.ToLower().Contains(department.ToLower()));
+            assignments = assignments.Where(x => x.Employee != null && x.Employee.Department.ToLower().Contains(department.ToLower()));
         }
 
         return assignments
-            .OrderBy(x => x.Employee!.Department)
-            .ThenBy(x => x.Employee!.LastName)
-            .ThenBy(x => x.Test!.Title)
+            .OrderBy(x => x.Employee != null ? x.Employee.Department : string.Empty)
+            .ThenBy(x => x.Employee != null ? x.Employee.LastName : string.Empty)
+            .ThenBy(x => x.Test != null ? x.Test.Title : string.Empty)
             .Select(x => new TestResultReportDto(
                 x.Id,
                 x.EmployeeId,
-                x.Employee!.LastName + " " + x.Employee.FirstName + " " + (x.Employee.MiddleName ?? string.Empty),
-                x.Employee.Department,
-                x.Employee.Position,
+                x.Employee != null ? x.Employee.LastName + " " + x.Employee.FirstName + " " + (x.Employee.MiddleName ?? string.Empty) : string.Empty,
+                x.Employee != null ? x.Employee.Department : string.Empty,
+                x.Employee != null && x.Employee.PositionRef != null ? x.Employee.PositionRef.Name : string.Empty,
                 x.TestId,
-                x.Test!.Title,
+                x.Test != null ? x.Test.Title : string.Empty,
                 x.Status.ToString(),
                 x.LastScorePercent,
-                x.LastScorePercent.HasValue ? x.LastScorePercent.Value >= x.Test.PassingScorePercent : null,
+                x.LastScorePercent.HasValue && x.Test != null ? x.LastScorePercent.Value >= x.Test.PassingScorePercent : null,
                 x.AssignedAt,
                 x.Deadline,
                 x.CompletedAt));

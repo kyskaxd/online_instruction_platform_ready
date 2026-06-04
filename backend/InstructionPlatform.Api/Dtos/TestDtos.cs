@@ -43,6 +43,7 @@ public record MyTestAssignmentDto(
     string? Description,
     string Status,
     int? LastScorePercent,
+    int AttemptCount,
     DateTime AssignedAt,
     DateTime? Deadline,
     DateTime? CompletedAt,
@@ -82,3 +83,28 @@ public record SubmitTestResponse(
     bool IsPassed,
     int CorrectAnswers,
     int TotalQuestions);
+
+public class TestDetailDto
+{
+    public int Id { get; set; }
+    public string Title { get; set; } = string.Empty;
+    public string? Description { get; set; }
+    public int PassingScorePercent { get; set; }
+    public List<TestDetailQuestionDto> Questions { get; set; } = [];
+}
+
+public class TestDetailQuestionDto
+{
+    public int Id { get; set; }
+    public string Text { get; set; } = string.Empty;
+    public QuestionType Type { get; set; }
+    public string? ExpectedAnswer { get; set; }
+    public List<TestDetailOptionDto> Options { get; set; } = [];
+}
+
+public class TestDetailOptionDto
+{
+    public int Id { get; set; }
+    public string Text { get; set; } = string.Empty;
+    public bool IsCorrect { get; set; }
+}

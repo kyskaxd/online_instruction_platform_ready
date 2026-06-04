@@ -3,11 +3,31 @@ using System.Text.Json.Serialization;
 using InstructionPlatform.Api.Data;
 using InstructionPlatform.Api.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 
-var builder = WebApplication.CreateBuilder(args);
+var currentDirectory = Directory.GetCurrentDirectory();
+var contentRootPath = File.Exists(Path.Combine(currentDirectory, "appsettings.json"))
+    ? currentDirectory
+    : AppContext.BaseDirectory;
+
+var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+{
+    Args = args,
+    ContentRootPath = contentRootPath
+});
 const string accessTokenCookieName = "instruction_platform_access_token";
+
+builder.Logging.ClearProviders();
+builder.Logging.AddConsole();
+builder.Logging.AddDebug();
+
+var dataProtectionKeysPath = Path.Combine(builder.Environment.ContentRootPath, "data-protection-keys");
+Directory.CreateDirectory(dataProtectionKeysPath);
+builder.Services.AddDataProtection()
+    .PersistKeysToFileSystem(new DirectoryInfo(dataProtectionKeysPath))
+    .SetApplicationName("InstructionPlatform.Api");
 
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
@@ -139,7 +159,10 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.UseHttpsRedirection();
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
 app.UseCors("VueClient");
 app.UseAuthentication();
 app.UseAuthorization();

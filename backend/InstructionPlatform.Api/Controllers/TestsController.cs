@@ -39,6 +39,94 @@ public class TestsController(AppDbContext db) : ControllerBase
     }
 
     [Authorize(Roles = "Admin,Manager")]
+    [HttpGet("{testId:int}")]
+    public async Task<ActionResult<TestDetailDto>> GetById(int testId)
+    {
+        var test = await db.Tests
+            .AsNoTracking()
+            .Include(x => x.Questions)
+            .ThenInclude(x => x.Options)
+            .FirstOrDefaultAsync(x => x.Id == testId && x.IsActive);
+
+        if (test is null)
+        {
+            return NotFound("Тест не найден.");
+        }
+
+        var dto = new TestDetailDto
+        {
+            Id = test.Id,
+            Title = test.Title,
+            Description = test.Description,
+            PassingScorePercent = test.PassingScorePercent,
+            Questions = test.Questions.Select(q => new TestDetailQuestionDto
+            {
+                Id = q.Id,
+                Text = q.Text,
+                Type = q.Type,
+                ExpectedAnswer = q.ExpectedAnswer,
+                Options = q.Options.Select(o => new TestDetailOptionDto
+                {
+                    Id = o.Id,
+                    Text = o.Text,
+                    IsCorrect = o.IsCorrect
+                }).ToList()
+            }).ToList()
+        };
+
+        return Ok(dto);
+    }
+
+    [Authorize(Roles = "Admin,Manager")]
+    [HttpPut("{testId:int}")]
+    public async Task<IActionResult> Update(int testId, [FromBody] TestImportRequest request)
+    {
+        var test = await db.Tests
+            .Include(x => x.Questions)
+            .ThenInclude(x => x.Options)
+            .FirstOrDefaultAsync(x => x.Id == testId && x.IsActive);
+
+        if (test is null)
+        {
+            return NotFound("Тест не найден.");
+        }
+
+        var validationError = await ValidateImportRequest(request);
+        if (validationError is not null)
+        {
+            return BadRequest(validationError);
+        }
+
+        test.Title = request.Title;
+        test.Description = request.Description;
+        test.PassingScorePercent = request.PassingScorePercent;
+
+        // Удалить старые вопросы
+        db.TestQuestions.RemoveRange(test.Questions);
+        test.Questions.Clear();
+
+        // Добавить новые вопросы
+        foreach (var questionRequest in request.Questions)
+        {
+            var question = new TestQuestion
+            {
+                TestId = testId,
+                Text = questionRequest.Text,
+                Type = questionRequest.Type,
+                ExpectedAnswer = questionRequest.ExpectedAnswer,
+                Options = questionRequest.Options.Select(o => new TestAnswerOption
+                {
+                    Text = o.Text,
+                    IsCorrect = o.IsCorrect
+                }).ToList()
+            };
+            test.Questions.Add(question);
+        }
+
+        await db.SaveChangesAsync();
+        return NoContent();
+    }
+    [Authorize(Roles = "Admin,Manager")]
     [HttpPost("import-json")]
     public async Task<ActionResult<TestListDto>> ImportJson([FromBody] TestImportRequest request)
     {
@@ -223,6 +311,7 @@ public class TestsController(AppDbContext db) : ControllerBase
                 x.Test.Description,
                 x.Status.ToString(),
                 x.LastScorePercent,
+                x.Attempts.Count,
                 x.AssignedAt,
                 x.Deadline,
                 x.CompletedAt,
@@ -251,6 +340,12 @@ public class TestsController(AppDbContext db) : ControllerBase
         if (assignment?.Test is null)
         {
             return NotFound("Тест не назначен этому сотруднику.");
+        }
+
+        var attemptsCount = await db.TestAttempts.CountAsync(x => x.TestAssignmentId == assignment.Id);
+        if (attemptsCount >= 2)
+        {
+            return BadRequest("Лимит попыток на тест исчерпан.");
         }
 
         if (assignment.Status == TestAssignmentStatus.Assigned)
@@ -300,6 +395,12 @@ public class TestsController(AppDbContext db) : ControllerBase
         if (assignment?.Test is null)
         {
             return NotFound("Тест не назначен этому сотруднику.");
+        }
+
+        var attemptsCount = await db.TestAttempts.CountAsync(x => x.TestAssignmentId == assignment.Id);
+        if (attemptsCount >= 2)
+        {
+            return BadRequest("Лимит попыток на тест исчерпан.");
         }
 
         var test = assignment.Test;
