@@ -1,5 +1,5 @@
 <template>
-  <section class="card">
+  <section v-if="canManageEmployees" class="card">
     <h1>Управление персоналом</h1>
     <div v-if="error" class="error">{{ error }}</div>
     <div v-if="success" class="success">{{ success }}</div>
@@ -19,7 +19,7 @@
           Отдел
           <select v-model.number="positionForm.departmentId" required>
             <option value="0" disabled>Выберите отдел</option>
-            <option v-for="department in departments" :key="department.id" :value="department.id">
+            <option v-for="department in departmentsForEmployeeForm" :key="department.id" :value="department.id">
               {{ department.name }}
             </option>
           </select>
@@ -39,7 +39,7 @@
           Отдел
           <select v-model.number="form.departmentId" required>
             <option value="0" disabled>Выберите отдел</option>
-            <option v-for="department in departments" :key="department.id" :value="department.id">
+            <option v-for="department in departmentsForEmployeeForm" :key="department.id" :value="department.id">
               {{ department.name }}
             </option>
           </select>
@@ -98,7 +98,11 @@
       <article v-for="employee in filteredEmployees" :key="employee.id" class="employee-card">
         <div class="employee-card__top">
           <div>
-            <h3>{{ employee.lastName }} {{ employee.firstName }} {{ employee.middleName || '' }}</h3>
+            <h3>
+              <router-link class="employee-name-link" :to="`/employees/${employee.id}`">
+                {{ employee.lastName }} {{ employee.firstName }} {{ employee.middleName || '' }}
+              </router-link>
+            </h3>
             <p>{{ employee.email }}</p>
           </div>
           <span class="badge">{{ roleLabel(employee.role) }}</span>
@@ -125,11 +129,11 @@
 
         <button
           v-if="canDelete(employee)"
-          :class="employee.isActive ? 'danger' : 'success'"
+          :class="['employee-action', employee.isActive ? 'employee-action--freeze' : 'employee-action--unfreeze']"
           :disabled="deletingId === employee.id"
           @click="toggleActive(employee)"
         >
-          {{ employee.isActive ? 'Удалить' : 'Разморозить' }}
+          {{ employee.isActive ? 'Заморозить' : 'Разморозить' }}
         </button>
       </article>
     </div>
@@ -182,6 +186,7 @@ const roleLabels = {
 const currentUser = getCurrentUser()
 const isAdmin = computed(() => currentUser?.role === 'Admin')
 const isHR = computed(() => currentUser?.role === 'HR')
+const canManageEmployees = computed(() => currentUser?.role === 'Admin' || currentUser?.role === 'HR')
 
 const filteredEmployees = computed(() => {
   const query = searchQuery.value.trim().toLowerCase()
@@ -201,6 +206,7 @@ const filteredEmployees = computed(() => {
 })
 
 const departmentsForFilter = computed(() => departments.value.filter(d => d.name !== 'Administration'))
+const departmentsForEmployeeForm = computed(() => departments.value.filter(d => d.name !== 'Administration'))
 
 async function loadEmployees() {
   employees.value = await apiFetch('/api/employees')
@@ -314,7 +320,7 @@ watch(
 )
 
 async function toggleActive(employee) {
-  const action = employee.isActive ? 'Удалить' : 'Разморозить'
+  const action = employee.isActive ? 'Заморозить' : 'Разморозить'
   if (!confirm(`${action} сотрудника ${employee.lastName} ${employee.firstName}?`)) {
     return
   }
@@ -416,6 +422,14 @@ onMounted(async () => {
   font-size: 18px;
 }
 
+.employee-name-link {
+  color: #172033;
+}
+
+.employee-name-link:hover {
+  color: #2653ff;
+}
+
 .employee-card p {
   margin: 0;
   color: #667085;
@@ -445,6 +459,14 @@ onMounted(async () => {
 
 .employee-card button {
   justify-self: start;
+}
+
+.employee-action--freeze {
+  background: #d92d20;
+}
+
+.employee-action--unfreeze {
+  background: #039855;
 }
 
 .empty-state {

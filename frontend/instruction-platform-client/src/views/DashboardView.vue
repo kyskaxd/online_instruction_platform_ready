@@ -42,9 +42,11 @@
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { apiFetch } from '../api'
 
+const route = useRoute()
 const employee = ref({
   fullName: '',
   email: '',
@@ -56,6 +58,7 @@ const employee = ref({
 })
 const error = ref('')
 const isLoading = ref(true)
+const isEmployeeProfile = computed(() => !!route.params.id)
 
 const roleLabel = (role) => {
   const labels = {
@@ -77,8 +80,11 @@ function formatDate(value) {
 }
 
 async function loadProfile() {
+  isLoading.value = true
+  error.value = ''
+
   try {
-    const data = await apiFetch('/api/employees/me')
+    const data = await apiFetch(isEmployeeProfile.value ? `/api/employees/${route.params.id}` : '/api/employees/me')
     employee.value = {
       fullName: [data.lastName, data.firstName, data.middleName].filter(Boolean).join(' '),
       email: data.email,
@@ -96,6 +102,7 @@ async function loadProfile() {
 }
 
 onMounted(loadProfile)
+watch(() => route.params.id, loadProfile)
 </script>
 
 <style scoped>
