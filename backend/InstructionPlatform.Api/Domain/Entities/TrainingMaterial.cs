@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using InstructionPlatform.Api.Domain.Enums;
 
 namespace InstructionPlatform.Api.Domain.Entities;
 
@@ -13,6 +14,10 @@ public class TrainingMaterial
     public string Title { get; set; } = string.Empty;
 
     public string? Description { get; set; }
+
+    public InstructionCategory Category { get; set; } = InstructionCategory.OccupationalSafety;
+    public InstructionType InstructionType { get; set; } = InstructionType.Repeated;
+    public int RetrainingIntervalMonths { get; set; } = 12;
 
     [Required]
     [MaxLength(255)]
@@ -33,4 +38,5 @@ public class TrainingMaterial
     public Employee? UploadedByUser { get; set; }
 
     public ICollection<Test> Tests { get; set; } = new List<Test>();
+    public ICollection<MaterialStudyRecord> StudyRecords { get; set; } = new List<MaterialStudyRecord>();
 }

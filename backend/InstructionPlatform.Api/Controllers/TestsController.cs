@@ -16,6 +16,8 @@ namespace InstructionPlatform.Api.Controllers;
 [Authorize]
 public class TestsController(AppDbContext db) : ControllerBase
 {
+    private const int MaxAttempts = 2;
+
     [Authorize(Roles = "Admin,Manager")]
     [HttpGet]
     public async Task<ActionResult<List<TestListDto>>> GetAll()
@@ -29,6 +31,9 @@ public class TestsController(AppDbContext db) : ControllerBase
                 x.Id,
                 x.Title,
                 x.Description,
+                x.Category,
+                x.InstructionType,
+                x.RetrainingIntervalMonths,
                 x.PassingScorePercent,
                 x.Questions.Count,
                 x.CreatedAt,
@@ -58,6 +63,10 @@ public class TestsController(AppDbContext db) : ControllerBase
             Id = test.Id,
             Title = test.Title,
             Description = test.Description,
+            Category = test.Category,
+            InstructionType = test.InstructionType,
+            RetrainingIntervalMonths = test.RetrainingIntervalMonths,
+            TrainingMaterialId = test.TrainingMaterialId,
             PassingScorePercent = test.PassingScorePercent,
             Questions = test.Questions.Select(q => new TestDetailQuestionDto
             {
@@ -99,6 +108,10 @@ public class TestsController(AppDbContext db) : ControllerBase
 
         test.Title = request.Title;
         test.Description = request.Description;
+        test.Category = request.Category;
+        test.InstructionType = request.InstructionType;
+        test.RetrainingIntervalMonths = request.RetrainingIntervalMonths;
+        test.TrainingMaterialId = request.TrainingMaterialId;
         test.PassingScorePercent = request.PassingScorePercent;
 
         // Удалить старые вопросы
@@ -144,6 +157,9 @@ public class TestsController(AppDbContext db) : ControllerBase
             test.Id,
             test.Title,
             test.Description,
+            test.Category,
+            test.InstructionType,
+            test.RetrainingIntervalMonths,
             test.PassingScorePercent,
             test.Questions.Count,
             test.CreatedAt,
@@ -206,6 +222,9 @@ public class TestsController(AppDbContext db) : ControllerBase
             return BadRequest($"Сотрудники не найдены: {string.Join(", ", notFoundIds)}");
         }
 
+        var test = await db.Tests.AsNoTracking().FirstAsync(x => x.Id == testId);
+        var instructionType = request.InstructionType ?? test.InstructionType;
+
         var existingAssignments = await db.TestAssignments
             .Where(x => x.TestId == testId && employeeIds.Contains(x.EmployeeId))
             .ToListAsync();
@@ -214,6 +233,7 @@ public class TestsController(AppDbContext db) : ControllerBase
         foreach (var assignment in existingAssignments)
         {
             assignment.Deadline = ToUtc(request.Deadline);
+            assignment.InstructionType = instructionType;
         }
 
         var userId = User.GetUserId();
@@ -226,6 +246,7 @@ public class TestsController(AppDbContext db) : ControllerBase
                 AssignedByUserId = userId,
                 AssignedAt = DateTime.UtcNow,
                 Deadline = ToUtc(request.Deadline),
+                InstructionType = instructionType,
                 Status = TestAssignmentStatus.Assigned
             });
 
@@ -302,23 +323,84 @@ public class TestsController(AppDbContext db) : ControllerBase
         var assignments = await db.TestAssignments
             .AsNoTracking()
             .Include(x => x.Test)
+            .Include(x => x.Attempts)
             .Where(x => x.EmployeeId == employeeId.Value)
             .OrderByDescending(x => x.AssignedAt)
-            .Select(x => new MyTestAssignmentDto(
+            .ToListAsync();
+
+        var materialIds = assignments
+            .Where(x => x.Test?.TrainingMaterialId.HasValue == true)
+            .Select(x => x.Test!.TrainingMaterialId!.Value)
+            .Distinct()
+            .ToList();
+
+        var acknowledgedMaterialIds = await db.MaterialStudyRecords
+            .AsNoTracking()
+            .Where(x => x.EmployeeId == employeeId.Value
+                        && materialIds.Contains(x.TrainingMaterialId)
+                        && x.AcknowledgedAt != null)
+            .Select(x => x.TrainingMaterialId)
+            .ToListAsync();
+
+        var acknowledgedSet = acknowledgedMaterialIds.ToHashSet();
+
+        var result = assignments.Select(x =>
+        {
+            var materialId = x.Test?.TrainingMaterialId;
+            var materialRequired = materialId.HasValue;
+            var materialCompleted = materialId.HasValue && acknowledgedSet.Contains(materialId.Value);
+
+            var attemptCount = x.Attempts.Count;
+            var bestScore = x.Attempts.Count > 0 ? x.Attempts.Max(a => a.ScorePercent) : x.LastScorePercent;
+            var canRetake = CanRetakeAssignment(x);
+
+            return new MyTestAssignmentDto(
                 x.Id,
                 x.TestId,
                 x.Test!.Title,
                 x.Test.Description,
-                x.Status.ToString(),
+                x.Test.Category,
+                x.InstructionType,
+                ResolveDisplayStatus(x),
                 x.LastScorePercent,
-                x.Attempts.Count,
+                bestScore,
+                attemptCount,
+                MaxAttempts,
+                canRetake,
                 x.AssignedAt,
                 x.Deadline,
                 x.CompletedAt,
-                x.Test.TrainingMaterialId))
-            .ToListAsync();
+                x.NextRetrainingDueAt,
+                materialId,
+                materialRequired,
+                materialCompleted);
+        }).ToList();
 
-        return Ok(assignments);
+        return Ok(result);
+    }
+
+    [Authorize(Roles = "Employee")]
+    [HttpGet("{testId:int}/result")]
+    public async Task<ActionResult<TestAssignmentResultDto>> GetResult(int testId)
+    {
+        var employeeId = User.GetEmployeeId();
+        if (employeeId is null)
+        {
+            return BadRequest("Профиль сотрудника не привязан к пользователю.");
+        }
+
+        var assignment = await db.TestAssignments
+            .AsNoTracking()
+            .Include(x => x.Test)
+            .Include(x => x.Attempts)
+            .FirstOrDefaultAsync(x => x.TestId == testId && x.EmployeeId == employeeId.Value);
+
+        if (assignment?.Test is null)
+        {
+            return NotFound("Тест не назначен этому сотруднику.");
+        }
+
+        return Ok(MapAssignmentResult(assignment));
     }
 
     [Authorize(Roles = "Employee")]
@@ -332,6 +414,7 @@ public class TestsController(AppDbContext db) : ControllerBase
         }
 
         var assignment = await db.TestAssignments
+            .Include(x => x.Attempts)
             .Include(x => x.Test!)
             .ThenInclude(x => x.Questions)
             .ThenInclude(x => x.Options)
@@ -342,10 +425,23 @@ public class TestsController(AppDbContext db) : ControllerBase
             return NotFound("Тест не назначен этому сотруднику.");
         }
 
-        var attemptsCount = await db.TestAttempts.CountAsync(x => x.TestAssignmentId == assignment.Id);
-        if (attemptsCount >= 2)
+        if (!CanRetakeAssignment(assignment))
         {
-            return BadRequest("Лимит попыток на тест исчерпан.");
+            return BadRequest("Тест уже сдан или попытки исчерпаны. Откройте результат.");
+        }
+
+        var test = assignment.Test;
+        if (test.TrainingMaterialId.HasValue)
+        {
+            var materialStudied = await db.MaterialStudyRecords
+                .AnyAsync(x => x.EmployeeId == employeeId.Value
+                               && x.TrainingMaterialId == test.TrainingMaterialId.Value
+                               && x.AcknowledgedAt != null);
+
+            if (!materialStudied)
+            {
+                return BadRequest("Перед прохождением теста необходимо изучить и подтвердить ознакомление с обучающим материалом.");
+            }
         }
 
         if (assignment.Status == TestAssignmentStatus.Assigned)
@@ -353,8 +449,6 @@ public class TestsController(AppDbContext db) : ControllerBase
             assignment.Status = TestAssignmentStatus.InProgress;
             await db.SaveChangesAsync();
         }
-
-        var test = assignment.Test;
         var dto = new TakeTestDto(
             test.Id,
             assignment.Id,
@@ -387,6 +481,7 @@ public class TestsController(AppDbContext db) : ControllerBase
         }
 
         var assignment = await db.TestAssignments
+            .Include(x => x.Attempts)
             .Include(x => x.Test!)
             .ThenInclude(x => x.Questions)
             .ThenInclude(x => x.Options)
@@ -397,13 +492,25 @@ public class TestsController(AppDbContext db) : ControllerBase
             return NotFound("Тест не назначен этому сотруднику.");
         }
 
-        var attemptsCount = await db.TestAttempts.CountAsync(x => x.TestAssignmentId == assignment.Id);
-        if (attemptsCount >= 2)
+        if (!CanRetakeAssignment(assignment))
         {
-            return BadRequest("Лимит попыток на тест исчерпан.");
+            return BadRequest("Тест уже сдан или попытки исчерпаны.");
         }
 
         var test = assignment.Test;
+        if (test.TrainingMaterialId.HasValue)
+        {
+            var materialStudied = await db.MaterialStudyRecords
+                .AnyAsync(x => x.EmployeeId == employeeId.Value
+                               && x.TrainingMaterialId == test.TrainingMaterialId.Value
+                               && x.AcknowledgedAt != null);
+
+            if (!materialStudied)
+            {
+                return BadRequest("Перед прохождением теста необходимо изучить и подтвердить ознакомление с обучающим материалом.");
+            }
+        }
+
         var questions = test.Questions.OrderBy(q => q.SortOrder).ToList();
         if (questions.Count == 0)
         {
@@ -499,9 +606,25 @@ public class TestsController(AppDbContext db) : ControllerBase
 
         db.TestAttempts.Add(attempt);
 
+        var completedAt = DateTime.UtcNow;
+        var attemptsAfterSubmit = await db.TestAttempts.CountAsync(x => x.TestAssignmentId == assignment.Id) + 1;
+
         assignment.LastScorePercent = score;
-        assignment.CompletedAt = DateTime.UtcNow;
-        assignment.Status = isPassed ? TestAssignmentStatus.Passed : TestAssignmentStatus.Failed;
+        assignment.CompletedAt = completedAt;
+
+        if (isPassed || assignment.Status == TestAssignmentStatus.Passed)
+        {
+            assignment.Status = TestAssignmentStatus.Passed;
+            assignment.NextRetrainingDueAt = completedAt.AddMonths(test.RetrainingIntervalMonths);
+        }
+        else if (attemptsAfterSubmit >= MaxAttempts)
+        {
+            assignment.Status = TestAssignmentStatus.Failed;
+        }
+        else
+        {
+            assignment.Status = TestAssignmentStatus.InProgress;
+        }
 
         await db.SaveChangesAsync();
 
@@ -518,6 +641,11 @@ public class TestsController(AppDbContext db) : ControllerBase
         if (request.PassingScorePercent is < 0 or > 100)
         {
             return "Проходной балл должен быть от 0 до 100.";
+        }
+
+        if (request.RetrainingIntervalMonths is < 1 or > 60)
+        {
+            return "Срок повторного инструктажа должен быть от 1 до 60 месяцев.";
         }
 
         if (request.TrainingMaterialId.HasValue && !await db.TrainingMaterials.AnyAsync(x => x.Id == request.TrainingMaterialId.Value && x.IsActive))
@@ -580,6 +708,9 @@ public class TestsController(AppDbContext db) : ControllerBase
             Title = request.Title.Trim(),
             Description = request.Description?.Trim(),
             TrainingMaterialId = request.TrainingMaterialId,
+            Category = request.Category,
+            InstructionType = request.InstructionType,
+            RetrainingIntervalMonths = request.RetrainingIntervalMonths,
             PassingScorePercent = request.PassingScorePercent,
             CreatedByUserId = userId,
             CreatedAt = DateTime.UtcNow,
@@ -618,6 +749,60 @@ public class TestsController(AppDbContext db) : ControllerBase
 
         return test;
     }
+    private static string ResolveDisplayStatus(TestAssignment assignment)
+    {
+        if (assignment.Status == TestAssignmentStatus.Passed || assignment.Attempts.Any(x => x.IsPassed))
+        {
+            return TestAssignmentStatus.Passed.ToString();
+        }
+
+        return assignment.Status.ToString();
+    }
+
+    private static bool CanRetakeAssignment(TestAssignment assignment)
+    {
+        if (assignment.Status == TestAssignmentStatus.Passed)
+        {
+            return false;
+        }
+
+        return assignment.Attempts.Count < MaxAttempts;
+    }
+
+    private static TestAssignmentResultDto MapAssignmentResult(TestAssignment assignment)
+    {
+        var test = assignment.Test!;
+        var attempts = assignment.Attempts
+            .OrderBy(x => x.FinishedAt)
+            .Select((attempt, index) => new TestAttemptSummaryDto(
+                attempt.Id,
+                index + 1,
+                attempt.ScorePercent,
+                attempt.IsPassed,
+                attempt.FinishedAt ?? attempt.StartedAt))
+            .ToList();
+
+        var bestScore = attempts.Count > 0
+            ? attempts.Max(x => x.ScorePercent)
+            : assignment.LastScorePercent;
+
+        return new TestAssignmentResultDto(
+            assignment.Id,
+            assignment.TestId,
+            test.Title,
+            test.Description,
+            test.Category,
+            assignment.InstructionType,
+            ResolveDisplayStatus(assignment),
+            test.PassingScorePercent,
+            bestScore,
+            attempts.Count,
+            MaxAttempts,
+            CanRetakeAssignment(assignment),
+            assignment.NextRetrainingDueAt,
+            attempts);
+    }
+
     private static DateTime? ToUtc(DateTime? value)
     {
         if (value is null)

@@ -4,7 +4,7 @@
       <router-link class="brand" to="/">Онлайн-инструктажи</router-link>
       <nav>
         <router-link v-if="canViewMaterials" to="/materials">Материалы</router-link>
-        <router-link v-if="isEmployee" to="/my-tests">Мои тесты</router-link>
+        <router-link v-if="isEmployee" to="/my-tests">Мои инструктажи</router-link>
         <router-link v-if="isAdmin || isHR || isManager" to="/employees">Сотрудники</router-link>
         <router-link v-if="isManager" to="/tests/import">Тесты</router-link>
         <router-link v-if="isManager" to="/reports">Отчёты</router-link>

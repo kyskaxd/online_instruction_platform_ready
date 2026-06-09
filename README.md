@@ -198,15 +198,22 @@ frontend/instruction-platform-client/vite.config.js
 
 Если поменяешь порт backend, поменяй `target` в `vite.config.js`.
 
-### JWT-ключ
+### JWT-ключ и сессия
 
 Для учебного проекта ключ уже задан в `appsettings.json`. Для реального проекта его надо заменить:
 
 ```json
-"Key": "INSTRUCTION_PLATFORM_SECRET_KEY_CHANGE_ME_123456789"
+"Key": "INSTRUCTION_PLATFORM_SECRET_KEY_CHANGE_ME_123456789",
+"ExpiresHours": 24,
+"RefreshTokenExpiresDays": 30
 ```
 
 Ключ должен быть длиннее 32 символов.
+
+- `ExpiresHours` — срок жизни access-токена (по умолчанию 24 часа)
+- `RefreshTokenExpiresDays` — срок жизни refresh-токена (по умолчанию 30 дней)
+
+При истечении access-токена frontend автоматически обновляет сессию через `POST /api/auth/refresh`.
 
 ### Автосоздание таблиц
 

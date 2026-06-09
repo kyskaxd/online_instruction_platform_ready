@@ -9,6 +9,7 @@ import TestCreateView from '../views/TestCreateView.vue'
 import MyTestsView from '../views/MyTestsView.vue'
 import TestPassingView from '../views/TestPassingView.vue'
 import ReportsView from '../views/ReportsView.vue'
+import TestResultView from '../views/TestResultView.vue'
 
 const routes = [
   { path: '/', name: 'dashboard', component: DashboardView, meta: { requiresAuth: true } },
@@ -21,6 +22,7 @@ const routes = [
   { path: '/tests/:id/edit', name: 'test-edit', component: TestCreateView, meta: { requiresAuth: true, roles: ['Admin', 'Manager'] } },
   { path: '/my-tests', name: 'my-tests', component: MyTestsView, meta: { requiresAuth: true, roles: ['Employee'] } },
   { path: '/tests/:id/take', name: 'test-passing', component: TestPassingView, meta: { requiresAuth: true, roles: ['Employee'] } },
+  { path: '/tests/:id/result', name: 'test-result', component: TestResultView, meta: { requiresAuth: true, roles: ['Employee'] } },
   { path: '/reports', name: 'reports', component: ReportsView, meta: { requiresAuth: true, roles: ['Admin', 'Manager'] } }
 ]
 

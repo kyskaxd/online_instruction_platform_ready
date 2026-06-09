@@ -16,6 +16,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<TestAttemptAnswer> TestAttemptAnswers => Set<TestAttemptAnswer>();
     public DbSet<Department> Departments => Set<Department>();
     public DbSet<Position> Positions => Set<Position>();
+    public DbSet<MaterialStudyRecord> MaterialStudyRecords => Set<MaterialStudyRecord>();
+    public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -53,6 +55,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 
         modelBuilder.Entity<TrainingMaterial>(entity =>
         {
+            entity.Property(x => x.Category).HasConversion<string>().HasMaxLength(30);
+            entity.Property(x => x.InstructionType).HasConversion<string>().HasMaxLength(30);
             entity.HasOne(x => x.UploadedByUser)
                 .WithMany(x => x.UploadedTrainingMaterials)
                 .HasForeignKey(x => x.UploadedByUserId)
@@ -61,6 +65,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 
         modelBuilder.Entity<Test>(entity =>
         {
+            entity.Property(x => x.Category).HasConversion<string>().HasMaxLength(30);
+            entity.Property(x => x.InstructionType).HasConversion<string>().HasMaxLength(30);
             entity.HasOne(x => x.TrainingMaterial)
                 .WithMany(x => x.Tests)
                 .HasForeignKey(x => x.TrainingMaterialId)
@@ -91,6 +97,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         modelBuilder.Entity<TestAssignment>(entity =>
         {
             entity.Property(x => x.Status).HasConversion<string>().HasMaxLength(30);
+            entity.Property(x => x.InstructionType).HasConversion<string>().HasMaxLength(30);
             entity.HasOne(x => x.Test)
                 .WithMany(x => x.Assignments)
                 .HasForeignKey(x => x.TestId)
@@ -136,5 +143,26 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
                 .HasForeignKey(x => x.TestAnswerOptionId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
+
+        modelBuilder.Entity<MaterialStudyRecord>(entity =>
+        {
+            entity.HasOne(x => x.Employee)
+                .WithMany()
+                .HasForeignKey(x => x.EmployeeId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.TrainingMaterial)
+                .WithMany(x => x.StudyRecords)
+                .HasForeignKey(x => x.TrainingMaterialId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<RefreshToken>(entity =>
+        {
+            entity.HasOne(x => x.Employee)
+                .WithMany()
+                .HasForeignKey(x => x.EmployeeId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
     }
 }

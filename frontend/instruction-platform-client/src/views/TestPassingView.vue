@@ -1,4 +1,10 @@
 <template>
+  <section class="card" v-if="error && !test">
+    <h1>Инструктаж недоступен</h1>
+    <div class="error">{{ error }}</div>
+    <router-link :to="`/tests/${route.params.id}/result`">Посмотреть результат</router-link>
+  </section>
+
   <section class="card" v-if="test">
     <h1>{{ test.title }}</h1>
     <p>{{ test.description }}</p>
@@ -85,7 +91,7 @@ async function submit() {
       method: 'POST',
       body: JSON.stringify(payload)
     })
-    router.push('/my-tests')
+    setTimeout(() => router.push(`/tests/${route.params.id}/result`), 2500)
   } catch (e) {
     error.value = e.message
   }

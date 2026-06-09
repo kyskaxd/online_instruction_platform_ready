@@ -1,3 +1,5 @@
+using InstructionPlatform.Api.Domain.Enums;
+
 namespace InstructionPlatform.Api.Dtos;
 
 public record TestResultReportDto(
@@ -8,9 +10,12 @@ public record TestResultReportDto(
     string Position,
     int TestId,
     string TestTitle,
+    InstructionCategory Category,
+    InstructionType InstructionType,
     string Status,
     int? ScorePercent,
     bool? IsPassed,
     DateTime AssignedAt,
     DateTime? Deadline,
-    DateTime? CompletedAt);
+    DateTime? CompletedAt,
+    DateTime? NextRetrainingDueAt);

@@ -9,6 +9,15 @@
         <input v-model="filters.department" placeholder="Например: IT">
       </label>
       <label>
+        Направление
+        <select v-model="filters.category">
+          <option value="">Все направления</option>
+          <option v-for="item in instructionCategories" :key="item.value" :value="item.value">
+            {{ item.label }}
+          </option>
+        </select>
+      </label>
+      <label>
         Тест
         <select v-model="filters.testId">
           <option value="">Все тесты</option>
@@ -38,20 +47,26 @@
         <tr>
           <th>Сотрудник</th>
           <th>Отдел</th>
+          <th>Направление</th>
           <th>Тест</th>
           <th>Статус</th>
           <th>Балл</th>
           <th>Дата прохождения</th>
+          <th>Следующий инструктаж</th>
         </tr>
       </thead>
       <tbody>
         <tr v-for="row in rows" :key="row.assignmentId">
           <td>{{ row.employeeFullName }}<br><small>{{ row.position }}</small></td>
           <td>{{ row.department }}</td>
+          <td>{{ categoryLabel(row.category) }}</td>
           <td>{{ row.testTitle }}</td>
           <td><span :class="['status-text', statusClass(row.status)]">{{ statusLabel(row.status) }}</span></td>
           <td>{{ row.scorePercent ?? '-' }}</td>
           <td>{{ row.completedAt ? new Date(row.completedAt).toLocaleString() : '-' }}</td>
+          <td :class="{ overdue: isRetrainingOverdue(row.nextRetrainingDueAt) }">
+            {{ formatDate(row.nextRetrainingDueAt) }}
+          </td>
         </tr>
       </tbody>
     </table>
@@ -61,12 +76,18 @@
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
 import { apiBlob, apiFetch } from '../api'
+import {
+  categoryLabel,
+  formatDate,
+  instructionCategories,
+  isRetrainingOverdue
+} from '../instructionLabels'
 
 const rows = ref([])
 const tests = ref([])
 const employees = ref([])
 const error = ref('')
-const filters = reactive({ department: '', testId: '', employeeId: '' })
+const filters = reactive({ department: '', category: '', testId: '', employeeId: '' })
 
 const statusLabels = {
   Assigned: 'Назначен',
@@ -78,6 +99,7 @@ const statusLabels = {
 function buildQuery() {
   const params = new URLSearchParams()
   if (filters.department) params.set('department', filters.department)
+  if (filters.category) params.set('category', filters.category)
   if (filters.testId) params.set('testId', filters.testId)
   if (filters.employeeId) params.set('employeeId', filters.employeeId)
   return params.toString()
@@ -154,5 +176,10 @@ onMounted(async () => {
 
 .status-text--failed {
   color: #b42318;
+}
+
+.overdue {
+  color: #b42318;
+  font-weight: 700;
 }
 </style>

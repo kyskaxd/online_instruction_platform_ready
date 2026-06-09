@@ -1,6 +1,7 @@
 using System.IO.Compression;
 using InstructionPlatform.Api.Data;
 using InstructionPlatform.Api.Dtos;
+using InstructionPlatform.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -16,9 +17,10 @@ public class ReportsController(AppDbContext db) : ControllerBase
     public async Task<ActionResult<List<TestResultReportDto>>> GetTestResults(
         [FromQuery] int? testId,
         [FromQuery] int? employeeId,
-        [FromQuery] string? department)
+        [FromQuery] string? department,
+        [FromQuery] Domain.Enums.InstructionCategory? category)
     {
-        var query = BuildReportQuery(testId, employeeId, department);
+        var query = BuildReportQuery(testId, employeeId, department, category);
         return Ok(await query.ToListAsync());
     }
 
@@ -26,9 +28,10 @@ public class ReportsController(AppDbContext db) : ControllerBase
     public async Task<IActionResult> ExportTestResultsExcel(
         [FromQuery] int? testId,
         [FromQuery] int? employeeId,
-        [FromQuery] string? department)
+        [FromQuery] string? department,
+        [FromQuery] Domain.Enums.InstructionCategory? category)
     {
-        var rows = await BuildReportQuery(testId, employeeId, department).ToListAsync();
+        var rows = await BuildReportQuery(testId, employeeId, department, category).ToListAsync();
 
         return File(
             BuildExcelFile(rows),
@@ -36,7 +39,11 @@ public class ReportsController(AppDbContext db) : ControllerBase
             "test-results.xlsx");
     }
 
-    private IQueryable<TestResultReportDto> BuildReportQuery(int? testId, int? employeeId, string? department)
+    private IQueryable<TestResultReportDto> BuildReportQuery(
+        int? testId,
+        int? employeeId,
+        string? department,
+        Domain.Enums.InstructionCategory? category)
     {
         var assignments = db.TestAssignments
             .AsNoTracking()
@@ -61,6 +68,11 @@ public class ReportsController(AppDbContext db) : ControllerBase
             assignments = assignments.Where(x => x.Employee != null && x.Employee.Department.ToLower().Contains(department.ToLower()));
         }
 
+        if (category.HasValue)
+        {
+            assignments = assignments.Where(x => x.Test != null && x.Test.Category == category.Value);
+        }
+
         return assignments
             .OrderBy(x => x.Employee != null ? x.Employee.Department : string.Empty)
             .ThenBy(x => x.Employee != null ? x.Employee.LastName : string.Empty)
@@ -73,12 +85,15 @@ public class ReportsController(AppDbContext db) : ControllerBase
                 x.Employee != null && x.Employee.PositionRef != null ? x.Employee.PositionRef.Name : string.Empty,
                 x.TestId,
                 x.Test != null ? x.Test.Title : string.Empty,
+                x.Test != null ? x.Test.Category : Domain.Enums.InstructionCategory.OccupationalSafety,
+                x.InstructionType,
                 x.Status.ToString(),
                 x.LastScorePercent,
                 x.LastScorePercent.HasValue && x.Test != null ? x.LastScorePercent.Value >= x.Test.PassingScorePercent : null,
                 x.AssignedAt,
                 x.Deadline,
-                x.CompletedAt));
+                x.CompletedAt,
+                x.NextRetrainingDueAt));
     }
 
     private static byte[] BuildExcelFile(List<TestResultReportDto> rows)
@@ -148,12 +163,15 @@ public class ReportsController(AppDbContext db) : ControllerBase
             "Сотрудник",
             "Отдел",
             "Должность",
+            "Направление",
+            "Вид инструктажа",
             "Тест",
             "Статус",
             "Балл",
             "Пройден",
             "Назначен",
-            "Дата прохождения"
+            "Дата прохождения",
+            "Следующий инструктаж"
         };
 
         var sheet = new System.Text.StringBuilder();
@@ -185,12 +203,15 @@ public class ReportsController(AppDbContext db) : ControllerBase
                 row.EmployeeFullName,
                 row.Department,
                 row.Position,
+                InstructionLabels.Category(row.Category),
+                InstructionLabels.Type(row.InstructionType),
                 row.TestTitle,
                 StatusLabel(row.Status),
                 row.ScorePercent?.ToString() ?? string.Empty,
                 row.IsPassed switch { true => "Да", false => "Нет", _ => string.Empty },
                 FormatDate(row.AssignedAt),
-                row.CompletedAt.HasValue ? FormatDate(row.CompletedAt.Value) : string.Empty
+                row.CompletedAt.HasValue ? FormatDate(row.CompletedAt.Value) : string.Empty,
+                row.NextRetrainingDueAt.HasValue ? FormatDate(row.NextRetrainingDueAt.Value) : string.Empty
             };
 
             sheet.Append($"<row r=\"{rowNumber}\">");

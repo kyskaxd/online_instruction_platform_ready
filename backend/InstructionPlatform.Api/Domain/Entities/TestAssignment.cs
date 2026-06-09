@@ -21,6 +21,8 @@ public class TestAssignment
 
     public DateTime AssignedAt { get; set; } = DateTime.UtcNow;
     public DateTime? Deadline { get; set; }
+    public InstructionType InstructionType { get; set; } = InstructionType.Repeated;
+    public DateTime? NextRetrainingDueAt { get; set; }
     public TestAssignmentStatus Status { get; set; } = TestAssignmentStatus.Assigned;
     public int? LastScorePercent { get; set; }
     public DateTime? CompletedAt { get; set; }

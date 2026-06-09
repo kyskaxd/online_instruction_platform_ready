@@ -1,6 +1,9 @@
 {
   "title": "Инструктаж по охране труда",
   "description": "Проверка знаний после изучения PDF-материала",
+  "category": "OccupationalSafety",
+  "instructionType": "Repeated",
+  "retrainingIntervalMonths": 12,
   "passingScorePercent": 80,
   "trainingMaterialId": null,
   "questions": [

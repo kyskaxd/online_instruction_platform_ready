@@ -12,6 +12,7 @@
       <thead>
         <tr>
           <th>Тест</th>
+          <th>Направление</th>
           <th>Вопросов</th>
           <th>Проходной балл</th>
           <th>Назначить</th>
@@ -21,6 +22,10 @@
       <tbody>
         <tr v-for="testItem in tests" :key="testItem.id">
           <td><b>{{ testItem.title }}</b><br /><small>{{ testItem.description }}</small></td>
+          <td>
+            {{ categoryLabel(testItem.category) }}<br>
+            <small>{{ instructionTypeLabel(testItem.instructionType) }}</small>
+          </td>
           <td>{{ testItem.questionsCount }}</td>
           <td>{{ testItem.passingScorePercent }}%</td>
           <td>
@@ -30,6 +35,18 @@
               </option>
             </select>
             <br />
+            <label class="assign-deadline">
+              Срок прохождения
+              <input v-model="assignDeadlines[testItem.id]" type="date">
+            </label>
+            <label class="assign-deadline">
+              Вид инструктажа
+              <select v-model="assignInstructionTypes[testItem.id]">
+                <option v-for="item in instructionTypes" :key="item.value" :value="item.value">
+                  {{ item.label }}
+                </option>
+              </select>
+            </label>
             <button class="secondary assign-button" @click="assign(testItem.id)">Назначить выбранным отделам</button>
           </td>
           <td>
@@ -47,6 +64,7 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
 import { apiFetch, getCurrentUser } from '../api'
+import { categoryLabel, instructionTypeLabel, instructionTypes } from '../instructionLabels'
 
 const tests = ref([])
 const departments = ref([])
@@ -54,12 +72,18 @@ const error = ref('')
 const success = ref('')
 const deletingId = ref(null)
 const assignDepartmentIds = reactive({})
+const assignDeadlines = reactive({})
+const assignInstructionTypes = reactive({})
 const isAdmin = computed(() => getCurrentUser()?.role === 'Admin')
 
 async function load() {
   tests.value = await apiFetch('/api/tests')
   departments.value = (await apiFetch('/api/departments'))
     .filter((department) => department.name !== 'Administration')
+
+  for (const testItem of tests.value) {
+    assignInstructionTypes[testItem.id] = testItem.instructionType
+  }
 }
 
 async function assign(testId) {
@@ -67,9 +91,14 @@ async function assign(testId) {
   success.value = ''
   try {
     const ids = (assignDepartmentIds[testId] || []).map(Number)
+    const testItem = tests.value.find((item) => item.id === testId)
     await apiFetch(`/api/tests/${testId}/assign`, {
       method: 'POST',
-      body: JSON.stringify({ departmentIds: ids, deadline: null })
+      body: JSON.stringify({
+        departmentIds: ids,
+        deadline: assignDeadlines[testId] || null,
+        instructionType: assignInstructionTypes[testId] || testItem?.instructionType || 'Repeated'
+      })
     })
     success.value = 'Тест назначен выбранным отделам'
   } catch (e) {
@@ -166,5 +195,10 @@ onMounted(load)
 .action-btn.danger:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+.assign-deadline {
+  display: block;
+  margin-top: 8px;
 }
 </style>

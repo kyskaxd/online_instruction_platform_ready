@@ -16,6 +16,14 @@ public class TrainingMaterialsController(AppDbContext db, IConfiguration configu
     [HttpGet]
     public async Task<ActionResult<List<TrainingMaterialDto>>> GetAll()
     {
+        var employeeId = User.GetEmployeeId();
+        var studyRecords = employeeId.HasValue
+            ? await db.MaterialStudyRecords
+                .AsNoTracking()
+                .Where(x => x.EmployeeId == employeeId.Value)
+                .ToDictionaryAsync(x => x.TrainingMaterialId)
+            : new Dictionary<int, MaterialStudyRecord>();
+
         var materials = await db.TrainingMaterials
             .AsNoTracking()
             .Where(x => x.IsActive)
@@ -24,11 +32,39 @@ public class TrainingMaterialsController(AppDbContext db, IConfiguration configu
                 x.Id,
                 x.Title,
                 x.Description,
+                x.Category,
+                x.InstructionType,
+                x.RetrainingIntervalMonths,
                 x.OriginalFileName,
                 x.FileSize,
                 x.UploadedAt,
-                x.UploadedByUserId))
+                x.UploadedByUserId,
+                null))
             .ToListAsync();
+
+        if (employeeId.HasValue)
+        {
+            materials = materials.Select(m =>
+            {
+                if (!studyRecords.TryGetValue(m.Id, out var record))
+                {
+                    return m with
+                    {
+                        StudyStatus = new MaterialStudyStatusDto(m.Id, false, false, null, null)
+                    };
+                }
+
+                return m with
+                {
+                    StudyStatus = new MaterialStudyStatusDto(
+                        m.Id,
+                        true,
+                        record.AcknowledgedAt.HasValue,
+                        record.FirstViewedAt,
+                        record.AcknowledgedAt)
+                };
+            }).ToList();
+        }
 
         return Ok(materials);
     }
@@ -54,6 +90,11 @@ public class TrainingMaterialsController(AppDbContext db, IConfiguration configu
             return BadRequest("Название материала обязательно.");
         }
 
+        if (request.RetrainingIntervalMonths is < 1 or > 60)
+        {
+            return BadRequest("Срок повторного инструктажа должен быть от 1 до 60 месяцев.");
+        }
+
         var uploadsFolder = GetUploadsFolder();
         Directory.CreateDirectory(uploadsFolder);
 
@@ -69,6 +110,9 @@ public class TrainingMaterialsController(AppDbContext db, IConfiguration configu
         {
             Title = request.Title.Trim(),
             Description = request.Description?.Trim(),
+            Category = request.Category,
+            InstructionType = request.InstructionType,
+            RetrainingIntervalMonths = request.RetrainingIntervalMonths,
             OriginalFileName = request.File.FileName,
             StoredFileName = storedFileName,
             ContentType = "application/pdf",
@@ -85,10 +129,14 @@ public class TrainingMaterialsController(AppDbContext db, IConfiguration configu
             material.Id,
             material.Title,
             material.Description,
+            material.Category,
+            material.InstructionType,
+            material.RetrainingIntervalMonths,
             material.OriginalFileName,
             material.FileSize,
             material.UploadedAt,
-            material.UploadedByUserId));
+            material.UploadedByUserId,
+            null));
     }
 
     [HttpGet("{id:int}/file")]
@@ -108,6 +156,129 @@ public class TrainingMaterialsController(AppDbContext db, IConfiguration configu
 
         var bytes = await System.IO.File.ReadAllBytesAsync(path);
         return File(bytes, "application/pdf", material.OriginalFileName);
+    }
+
+    [Authorize(Roles = "Employee")]
+    [HttpPost("{id:int}/view")]
+    public async Task<ActionResult<MaterialStudyStatusDto>> RecordView(int id)
+    {
+        var employeeId = User.GetEmployeeId();
+        if (employeeId is null)
+        {
+            return BadRequest("Профиль сотрудника не привязан к пользователю.");
+        }
+
+        var materialExists = await db.TrainingMaterials.AnyAsync(x => x.Id == id && x.IsActive);
+        if (!materialExists)
+        {
+            return NotFound("Материал не найден.");
+        }
+
+        var record = await db.MaterialStudyRecords
+            .FirstOrDefaultAsync(x => x.EmployeeId == employeeId.Value && x.TrainingMaterialId == id);
+
+        var now = DateTime.UtcNow;
+        if (record is null)
+        {
+            record = new MaterialStudyRecord
+            {
+                EmployeeId = employeeId.Value,
+                TrainingMaterialId = id,
+                FirstViewedAt = now,
+                LastViewedAt = now,
+                ViewCount = 1
+            };
+            db.MaterialStudyRecords.Add(record);
+        }
+        else
+        {
+            record.LastViewedAt = now;
+            record.ViewCount++;
+        }
+
+        await db.SaveChangesAsync();
+
+        return Ok(new MaterialStudyStatusDto(
+            id,
+            true,
+            record.AcknowledgedAt.HasValue,
+            record.FirstViewedAt,
+            record.AcknowledgedAt));
+    }
+
+    [Authorize(Roles = "Employee")]
+    [HttpPost("{id:int}/acknowledge")]
+    public async Task<ActionResult<MaterialStudyStatusDto>> Acknowledge(int id)
+    {
+        var employeeId = User.GetEmployeeId();
+        if (employeeId is null)
+        {
+            return BadRequest("Профиль сотрудника не привязан к пользователю.");
+        }
+
+        var materialExists = await db.TrainingMaterials.AnyAsync(x => x.Id == id && x.IsActive);
+        if (!materialExists)
+        {
+            return NotFound("Материал не найден.");
+        }
+
+        var record = await db.MaterialStudyRecords
+            .FirstOrDefaultAsync(x => x.EmployeeId == employeeId.Value && x.TrainingMaterialId == id);
+
+        var now = DateTime.UtcNow;
+        if (record is null)
+        {
+            record = new MaterialStudyRecord
+            {
+                EmployeeId = employeeId.Value,
+                TrainingMaterialId = id,
+                FirstViewedAt = now,
+                LastViewedAt = now,
+                ViewCount = 1,
+                AcknowledgedAt = now
+            };
+            db.MaterialStudyRecords.Add(record);
+        }
+        else
+        {
+            record.AcknowledgedAt = now;
+            record.LastViewedAt = now;
+        }
+
+        await db.SaveChangesAsync();
+
+        return Ok(new MaterialStudyStatusDto(
+            id,
+            true,
+            true,
+            record.FirstViewedAt,
+            record.AcknowledgedAt));
+    }
+
+    [HttpGet("{id:int}/study-status")]
+    public async Task<ActionResult<MaterialStudyStatusDto>> GetStudyStatus(int id)
+    {
+        var employeeId = User.GetEmployeeId();
+        if (employeeId is null)
+        {
+            return BadRequest("Профиль сотрудника не привязан к пользователю.");
+        }
+
+        var record = await db.MaterialStudyRecords
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.EmployeeId == employeeId.Value && x.TrainingMaterialId == id);
+
+        if (record is null)
+        {
+            return Ok(new MaterialStudyStatusDto(id, false, false, null, null));
+        }
+
+        return Ok(new MaterialStudyStatusDto(
+            id,
+            true,
+            record.AcknowledgedAt.HasValue,
+            record.FirstViewedAt,
+            record.AcknowledgedAt));
     }
 
     [Authorize(Roles = "Admin,Manager")]

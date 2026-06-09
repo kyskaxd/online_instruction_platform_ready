@@ -3,6 +3,7 @@ using System;
 using InstructionPlatform.Api.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace InstructionPlatform.Api.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260609133044_AddInstructionComplianceFeatures")]
+    partial class AddInstructionComplianceFeatures
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -114,6 +117,97 @@ namespace InstructionPlatform.Api.Migrations
                     b.ToTable("employees");
                 });
 
+            modelBuilder.Entity("InstructionPlatform.Api.Domain.Entities.InstructionJournalEntry", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<DateTime>("CompletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Department")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<string>("EmployeeFullName")
+                        .IsRequired()
+                        .HasMaxLength(250)
+                        .HasColumnType("character varying(250)");
+
+                    b.Property<int>("EmployeeId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("InstructedByUserId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("InstructionType")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<bool>("IsPassed")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("MaterialStudiedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("NextRetrainingDueAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Position")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<string>("ProtocolNumber")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<int>("ScorePercent")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("TestAssignmentId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("TestAttemptId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("TestId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("TestTitle")
+                        .IsRequired()
+                        .HasMaxLength(250)
+                        .HasColumnType("character varying(250)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EmployeeId");
+
+                    b.HasIndex("InstructedByUserId");
+
+                    b.HasIndex("ProtocolNumber")
+                        .IsUnique();
+
+                    b.HasIndex("TestAssignmentId");
+
+                    b.HasIndex("TestAttemptId");
+
+                    b.HasIndex("TestId");
+
+                    b.ToTable("instruction_journal_entries");
+                });
+
             modelBuilder.Entity("InstructionPlatform.Api.Domain.Entities.MaterialStudyRecord", b =>
                 {
                     b.Property<int>("Id")
@@ -174,45 +268,6 @@ namespace InstructionPlatform.Api.Migrations
                     b.HasIndex("DepartmentId");
 
                     b.ToTable("positions", (string)null);
-                });
-
-            modelBuilder.Entity("InstructionPlatform.Api.Domain.Entities.RefreshToken", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int>("EmployeeId")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime>("ExpiresAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("ReplacedByTokenHash")
-                        .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
-
-                    b.Property<DateTime?>("RevokedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("TokenHash")
-                        .IsRequired()
-                        .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("EmployeeId");
-
-                    b.HasIndex("TokenHash")
-                        .IsUnique();
-
-                    b.ToTable("refresh_tokens");
                 });
 
             modelBuilder.Entity("InstructionPlatform.Api.Domain.Entities.Test", b =>
@@ -536,6 +591,49 @@ namespace InstructionPlatform.Api.Migrations
                     b.Navigation("PositionRef");
                 });
 
+            modelBuilder.Entity("InstructionPlatform.Api.Domain.Entities.InstructionJournalEntry", b =>
+                {
+                    b.HasOne("InstructionPlatform.Api.Domain.Entities.Employee", "Employee")
+                        .WithMany()
+                        .HasForeignKey("EmployeeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("InstructionPlatform.Api.Domain.Entities.Employee", "InstructedByUser")
+                        .WithMany()
+                        .HasForeignKey("InstructedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("InstructionPlatform.Api.Domain.Entities.TestAssignment", "TestAssignment")
+                        .WithMany()
+                        .HasForeignKey("TestAssignmentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("InstructionPlatform.Api.Domain.Entities.TestAttempt", "TestAttempt")
+                        .WithMany()
+                        .HasForeignKey("TestAttemptId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("InstructionPlatform.Api.Domain.Entities.Test", "Test")
+                        .WithMany()
+                        .HasForeignKey("TestId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Employee");
+
+                    b.Navigation("InstructedByUser");
+
+                    b.Navigation("Test");
+
+                    b.Navigation("TestAssignment");
+
+                    b.Navigation("TestAttempt");
+                });
+
             modelBuilder.Entity("InstructionPlatform.Api.Domain.Entities.MaterialStudyRecord", b =>
                 {
                     b.HasOne("InstructionPlatform.Api.Domain.Entities.Employee", "Employee")
@@ -564,17 +662,6 @@ namespace InstructionPlatform.Api.Migrations
                         .IsRequired();
 
                     b.Navigation("Department");
-                });
-
-            modelBuilder.Entity("InstructionPlatform.Api.Domain.Entities.RefreshToken", b =>
-                {
-                    b.HasOne("InstructionPlatform.Api.Domain.Entities.Employee", "Employee")
-                        .WithMany()
-                        .HasForeignKey("EmployeeId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Employee");
                 });
 
             modelBuilder.Entity("InstructionPlatform.Api.Domain.Entities.Test", b =>

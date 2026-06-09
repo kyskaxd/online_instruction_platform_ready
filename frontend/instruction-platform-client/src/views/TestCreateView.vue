@@ -21,6 +21,39 @@
         <input type="number" v-model.number="test.passingScorePercent" min="0" max="100" />
       </div>
 
+      <div class="field-row">
+        <label>Направление</label>
+        <select v-model="test.category" required>
+          <option v-for="item in instructionCategories" :key="item.value" :value="item.value">
+            {{ item.label }}
+          </option>
+        </select>
+      </div>
+
+      <div class="field-row">
+        <label>Вид инструктажа</label>
+        <select v-model="test.instructionType" required>
+          <option v-for="item in instructionTypes" :key="item.value" :value="item.value">
+            {{ item.label }}
+          </option>
+        </select>
+      </div>
+
+      <div class="field-row">
+        <label>Срок повторного инструктажа (мес.)</label>
+        <input type="number" v-model.number="test.retrainingIntervalMonths" min="1" max="60" />
+      </div>
+
+      <div class="field-row">
+        <label>Обучающий материал (PDF)</label>
+        <select v-model="test.trainingMaterialId">
+          <option :value="null">Без привязки к материалу</option>
+          <option v-for="material in materials" :key="material.id" :value="material.id">
+            {{ material.title }} ({{ categoryLabel(material.category) }})
+          </option>
+        </select>
+      </div>
+
       <div class="questions">
         <h2>Вопросы</h2>
         <div v-if="test.questions.length === 0" class="empty-state">
@@ -85,6 +118,11 @@
 import { reactive, ref, computed, onMounted } from 'vue'
 import { apiFetch } from '../api'
 import { useRouter, useRoute } from 'vue-router'
+import {
+  categoryLabel,
+  instructionCategories,
+  instructionTypes
+} from '../instructionLabels'
 
 const router = useRouter()
 const route = useRoute()
@@ -98,10 +136,15 @@ const isEditing = computed(() => !!testId.value)
 const questionIdSeed = ref(1)
 const optionIdSeed = ref(1)
 
+const materials = ref([])
 const test = reactive({
   title: '',
   description: '',
   passingScorePercent: 80,
+  category: 'OccupationalSafety',
+  instructionType: 'Repeated',
+  retrainingIntervalMonths: 12,
+  trainingMaterialId: null,
   questions: []
 })
 
@@ -149,6 +192,10 @@ async function loadTest() {
     test.title = testData.title
     test.description = testData.description
     test.passingScorePercent = testData.passingScorePercent
+    test.category = testData.category
+    test.instructionType = testData.instructionType
+    test.retrainingIntervalMonths = testData.retrainingIntervalMonths
+    test.trainingMaterialId = testData.trainingMaterialId
     test.questions = testData.questions.map((q, qIdx) => ({
       id: qIdx,
       text: q.text,
@@ -177,6 +224,10 @@ async function saveTest() {
       title: test.title,
       description: test.description,
       passingScorePercent: test.passingScorePercent,
+      category: test.category,
+      instructionType: test.instructionType,
+      retrainingIntervalMonths: test.retrainingIntervalMonths,
+      trainingMaterialId: test.trainingMaterialId,
       questions: test.questions.map((question) => ({
         text: question.text,
         type: question.type,
@@ -214,9 +265,14 @@ async function saveTest() {
   }
 }
 
-onMounted(() => {
+async function loadMaterials() {
+  materials.value = await apiFetch('/api/training-materials')
+}
+
+onMounted(async () => {
+  await loadMaterials()
   if (isEditing.value) {
-    loadTest()
+    await loadTest()
   } else {
     test.questions.push(createQuestion())
   }

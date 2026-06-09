@@ -15,9 +15,12 @@ public class AuthController(
     AppDbContext db,
     PasswordHashService passwordHashService,
     JwtTokenService jwtTokenService,
+    RefreshTokenService refreshTokenService,
+    IConfiguration configuration,
     IWebHostEnvironment environment) : ControllerBase
 {
     private const string AccessTokenCookieName = "instruction_platform_access_token";
+    private const string RefreshTokenCookieName = "instruction_platform_refresh_token";
 
     [AllowAnonymous]
     [HttpPost("login")]
@@ -32,9 +35,35 @@ public class AuthController(
             return Unauthorized("Неверный email или пароль.");
         }
 
-        var token = jwtTokenService.CreateToken(user);
-        SetAccessTokenCookie(token);
+        await IssueTokensAsync(user);
+        return Ok(new AuthResponse(user.Id, user.Email, user.Role, user.Id));
+    }
 
+    [AllowAnonymous]
+    [HttpPost("refresh")]
+    public async Task<ActionResult<AuthResponse>> Refresh()
+    {
+        if (!Request.Cookies.TryGetValue(RefreshTokenCookieName, out var rawRefreshToken)
+            || string.IsNullOrWhiteSpace(rawRefreshToken))
+        {
+            return Unauthorized("Сессия истекла. Войдите снова.");
+        }
+
+        var refreshToken = await refreshTokenService.ValidateAsync(rawRefreshToken);
+        if (refreshToken?.Employee is null)
+        {
+            ClearAuthCookies();
+            return Unauthorized("Сессия истекла. Войдите снова.");
+        }
+
+        var (newRawToken, newRefreshEntity) = await refreshTokenService.CreateAsync(refreshToken.EmployeeId);
+        await refreshTokenService.RevokeAsync(refreshToken, newRefreshEntity.TokenHash);
+
+        var accessToken = jwtTokenService.CreateToken(refreshToken.Employee);
+        SetAccessTokenCookie(accessToken);
+        SetRefreshTokenCookie(newRawToken, newRefreshEntity.ExpiresAt);
+
+        var user = refreshToken.Employee;
         return Ok(new AuthResponse(user.Id, user.Email, user.Role, user.Id));
     }
 
@@ -103,9 +132,11 @@ public class AuthController(
 
     [Authorize]
     [HttpPost("logout")]
-    public IActionResult Logout()
+    public async Task<IActionResult> Logout()
     {
-        Response.Cookies.Delete(AccessTokenCookieName);
+        var userId = User.GetUserId();
+        await refreshTokenService.RevokeAllForEmployeeAsync(userId);
+        ClearAuthCookies();
         return NoContent();
     }
 
@@ -123,16 +154,42 @@ public class AuthController(
         return Ok(new CurrentUserResponse(user.Id, user.Email, user.Role, user.Id));
     }
 
+    private async Task IssueTokensAsync(Employee user)
+    {
+        var accessToken = jwtTokenService.CreateToken(user);
+        var (rawRefreshToken, refreshEntity) = await refreshTokenService.CreateAsync(user.Id);
+
+        SetAccessTokenCookie(accessToken);
+        SetRefreshTokenCookie(rawRefreshToken, refreshEntity.ExpiresAt);
+    }
+
     private void SetAccessTokenCookie(string token)
     {
-        Response.Cookies.Append(AccessTokenCookieName, token, new CookieOptions
+        var expiresHours = configuration.GetValue("Jwt:ExpiresHours", 24);
+        Response.Cookies.Append(AccessTokenCookieName, token, CreateCookieOptions(DateTimeOffset.UtcNow.AddHours(expiresHours)));
+    }
+
+    private void SetRefreshTokenCookie(string token, DateTime expiresAt)
+    {
+        Response.Cookies.Append(RefreshTokenCookieName, token, CreateCookieOptions(new DateTimeOffset(expiresAt, TimeSpan.Zero)));
+    }
+
+    private CookieOptions CreateCookieOptions(DateTimeOffset expires)
+    {
+        return new CookieOptions
         {
             HttpOnly = true,
             Secure = !environment.IsDevelopment(),
             SameSite = environment.IsDevelopment() ? SameSiteMode.Lax : SameSiteMode.None,
             Path = "/",
-            Expires = DateTimeOffset.UtcNow.AddHours(12)
-        });
+            Expires = expires
+        };
+    }
+
+    private void ClearAuthCookies()
+    {
+        Response.Cookies.Delete(AccessTokenCookieName);
+        Response.Cookies.Delete(RefreshTokenCookieName);
     }
 
     private static DateTime? ToUtc(DateTime? value)
