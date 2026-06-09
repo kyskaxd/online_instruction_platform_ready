@@ -24,7 +24,7 @@ public class PositionsController(AppDbContext db) : ControllerBase
         return Ok(positions);
     }
 
-    [Authorize(Roles = "Admin,HR")]
+    [Authorize]
     [HttpPost]
     public async Task<ActionResult<PositionDto>> Create([FromBody] CreatePositionRequest request)
     {

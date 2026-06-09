@@ -14,15 +14,13 @@ namespace InstructionPlatform.Api.Controllers;
 [Authorize]
 public class EmployeesController(AppDbContext db, PasswordHashService passwordHashService) : ControllerBase
 {
-    [Authorize(Roles = "Admin,HR,Manager")]
+    [Authorize(Roles = "Admin,HR")]
     [HttpGet]
     public async Task<ActionResult<List<EmployeeDto>>> GetAll(int? departmentId = null)
     {
         var employeesQuery = db.Employees.AsNoTracking()
             .Include(x => x.PositionRef)
-            .AsQueryable();
-
-        employeesQuery = ApplyVisibilityFilter(employeesQuery);
+            .Where(x => x.Role != UserRole.Admin);
 
         if (departmentId.HasValue)
         {
@@ -30,7 +28,8 @@ public class EmployeesController(AppDbContext db, PasswordHashService passwordHa
         }
 
         var employees = await employeesQuery
-            .OrderBy(x => x.Department)
+            .OrderByDescending(x => x.IsActive)
+            .ThenBy(x => x.Department)
             .ThenBy(x => x.PositionRef!.Name)
             .ThenBy(x => x.LastName)
             .Select(x => ToDto(x))
@@ -43,14 +42,10 @@ public class EmployeesController(AppDbContext db, PasswordHashService passwordHa
     [HttpGet("lookup")]
     public async Task<ActionResult<List<EmployeeLookupDto>>> GetLookup()
     {
-        var employeesQuery = db.Employees
+        var employees = await db.Employees
             .AsNoTracking()
             .Include(x => x.PositionRef)
-            .Where(x => x.IsActive);
-
-        employeesQuery = ApplyVisibilityFilter(employeesQuery);
-
-        var employees = await employeesQuery
+            .Where(x => x.IsActive)
             .OrderBy(x => x.Department)
             .ThenBy(x => x.LastName)
             .Select(x => new EmployeeLookupDto(
@@ -65,15 +60,13 @@ public class EmployeesController(AppDbContext db, PasswordHashService passwordHa
         return Ok(employees);
     }
 
-    [Authorize(Roles = "Admin,HR,Manager")]
+    [Authorize(Roles = "Admin,HR")]
     [HttpGet("{id:int}")]
     public async Task<ActionResult<EmployeeDto>> GetById(int id)
     {
-        var employeeQuery = db.Employees.AsNoTracking()
+        var employee = await db.Employees.AsNoTracking()
             .Include(x => x.PositionRef)
-            .Where(x => x.Id == id);
-
-        var employee = await ApplyVisibilityFilter(employeeQuery).FirstOrDefaultAsync();
+            .FirstOrDefaultAsync(x => x.Id == id && x.IsActive);
         return employee is null ? NotFound() : Ok(ToDto(employee));
     }
 
@@ -86,10 +79,7 @@ public class EmployeesController(AppDbContext db, PasswordHashService passwordHa
             return BadRequest("У пользователя не найден профиль сотрудника.");
         }
 
-        var employee = await db.Employees
-            .AsNoTracking()
-            .Include(x => x.PositionRef)
-            .FirstOrDefaultAsync(x => x.Id == employeeId.Value && x.IsActive);
+        var employee = await db.Employees.AsNoTracking().FirstOrDefaultAsync(x => x.Id == employeeId.Value && x.IsActive);
         return employee is null ? NotFound() : Ok(ToDto(employee));
     }
 
@@ -126,11 +116,6 @@ public class EmployeesController(AppDbContext db, PasswordHashService passwordHa
         if (department is null)
         {
             return BadRequest("Выбранный отдел не существует.");
-        }
-
-        if (department.Name == "Administration")
-        {
-            return BadRequest("Нельзя добавить сотрудника в системный отдел Administration.");
         }
 
         var position = await db.Positions.FindAsync(request.PositionId);
@@ -190,7 +175,7 @@ public class EmployeesController(AppDbContext db, PasswordHashService passwordHa
             return NotFound();
         }
 
-        if (employee.Role == UserRole.Admin || User.IsInRole("HR") && employee.Role == UserRole.HR)
+        if (employee.Role == UserRole.Admin)
         {
             return BadRequest("Нельзя удалить администратора.");
         }
@@ -216,7 +201,7 @@ public class EmployeesController(AppDbContext db, PasswordHashService passwordHa
             return NotFound();
         }
 
-        if (employee.Role == UserRole.Admin || User.IsInRole("HR") && employee.Role == UserRole.HR)
+        if (employee.Role == UserRole.Admin)
         {
             return BadRequest("Нельзя изменять статус администратора.");
         }
@@ -245,26 +230,6 @@ public class EmployeesController(AppDbContext db, PasswordHashService passwordHa
             DateTimeKind.Local => value.Value.ToUniversalTime(),
             _ => DateTime.SpecifyKind(value.Value, DateTimeKind.Utc)
         };
-    }
-
-    private IQueryable<Employee> ApplyVisibilityFilter(IQueryable<Employee> query)
-    {
-        if (User.IsInRole("Admin"))
-        {
-            return query;
-        }
-
-        if (User.IsInRole("HR"))
-        {
-            return query.Where(x => x.Role != UserRole.Admin && x.Role != UserRole.HR);
-        }
-
-        if (User.IsInRole("Manager"))
-        {
-            return query.Where(x => x.Role == UserRole.Employee);
-        }
-
-        return query.Where(_ => false);
     }
 
     private static EmployeeDto ToDto(Employee x) => new(
