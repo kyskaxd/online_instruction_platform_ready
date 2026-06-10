@@ -11,7 +11,7 @@ namespace InstructionPlatform.Api.Controllers;
 [ApiController]
 [Route("api/training-materials")]
 [Authorize]
-public class TrainingMaterialsController(AppDbContext db, IConfiguration configuration, IWebHostEnvironment environment) : ControllerBase
+public class TrainingMaterialsController(AppDbContext db, IConfiguration configuration, IWebHostEnvironment environment, InstructionValidationService validationService) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<List<TrainingMaterialDto>>> GetAll()
@@ -292,6 +292,46 @@ public class TrainingMaterialsController(AppDbContext db, IConfiguration configu
         }
 
         material.IsActive = false;
+        await db.SaveChangesAsync();
+        return NoContent();
+    }
+
+    [Authorize(Roles = "Admin,Manager")]
+    [HttpPut("{id:int}")]
+    public async Task<IActionResult> Update(int id, [FromForm] UpdateTrainingMaterialRequest request)
+    {
+        var material = await db.TrainingMaterials.FirstOrDefaultAsync(x => x.Id == id && x.IsActive);
+        if (material is null)
+        {
+            return NotFound("Материал не найден.");
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Title))
+        {
+            return BadRequest("Название материала обязательно.");
+        }
+
+        if (request.RetrainingIntervalMonths is < 1 or > 60)
+        {
+            return BadRequest("Срок повторного инструктажа должен быть от 1 до 60 месяцев.");
+        }
+
+        // Проверяем, что привязанные тесты совпадают с новой категорией и видом инструктажа
+        var conflictError = await validationService.ValidateMaterialInstructionMatch(
+            id,
+            request.Category,
+            request.InstructionType);
+        if (conflictError is not null)
+        {
+            return BadRequest(conflictError);
+        }
+
+        material.Title = request.Title.Trim();
+        material.Description = request.Description?.Trim();
+        material.Category = request.Category;
+        material.InstructionType = request.InstructionType;
+        material.RetrainingIntervalMonths = request.RetrainingIntervalMonths;
+
         await db.SaveChangesAsync();
         return NoContent();
     }
