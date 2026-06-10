@@ -31,3 +31,12 @@ public class UploadTrainingMaterialRequest
     public int RetrainingIntervalMonths { get; set; } = 12;
     public IFormFile File { get; set; } = default!;
 }
+
+public class UpdateTrainingMaterialRequest
+{
+    public string Title { get; set; } = string.Empty;
+    public string? Description { get; set; }
+    public InstructionCategory Category { get; set; } = InstructionCategory.OccupationalSafety;
+    public InstructionType InstructionType { get; set; } = InstructionType.Repeated;
+    public int RetrainingIntervalMonths { get; set; } = 12;
+}
