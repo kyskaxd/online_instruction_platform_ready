@@ -48,10 +48,13 @@
         <label>Обучающий материал (PDF)</label>
         <select v-model="test.trainingMaterialId">
           <option :value="null">Без привязки к материалу</option>
-          <option v-for="material in materials" :key="material.id" :value="material.id">
-            {{ material.title }} ({{ categoryLabel(material.category) }})
+          <option v-for="material in filteredMaterials" :key="material.id" :value="material.id">
+            {{ material.title }}
           </option>
         </select>
+        <small v-if="materials.length > 0 && filteredMaterials.length === 0">
+          Нет материалов с выбранным направлением и видом инструктажа
+        </small>
       </div>
 
       <div class="questions">
@@ -146,6 +149,15 @@ const test = reactive({
   retrainingIntervalMonths: 12,
   trainingMaterialId: null,
   questions: []
+})
+
+// Фильтруем материалы по категории и виду инструктажа теста
+const filteredMaterials = computed(() => {
+  return materials.value.filter(
+    material =>
+      material.category === test.category &&
+      material.instructionType === test.instructionType
+  )
 })
 
 function createOption() {
