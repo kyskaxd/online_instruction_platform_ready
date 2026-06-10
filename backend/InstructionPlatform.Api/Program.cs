@@ -1,4 +1,4 @@
-﻿using System.Text;
+using System.Text;
 using System.Text.Json.Serialization;
 using InstructionPlatform.Api.Data;
 using InstructionPlatform.Api.Services;
@@ -43,6 +43,7 @@ builder.Services.AddScoped<PasswordHashService>();
 builder.Services.AddScoped<JwtTokenService>();
 builder.Services.AddScoped<DbSeeder>();
 builder.Services.AddScoped<RefreshTokenService>();
+builder.Services.AddScoped<InstructionValidationService>();
 
 var jwtKey = builder.Configuration["Jwt:Key"];
 if (string.IsNullOrWhiteSpace(jwtKey) || jwtKey.Length < 32)
