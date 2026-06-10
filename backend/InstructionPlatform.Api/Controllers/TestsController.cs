@@ -1,4 +1,4 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using InstructionPlatform.Api.Data;
 using InstructionPlatform.Api.Domain.Entities;
@@ -14,7 +14,7 @@ namespace InstructionPlatform.Api.Controllers;
 [ApiController]
 [Route("api/tests")]
 [Authorize]
-public class TestsController(AppDbContext db) : ControllerBase
+public class TestsController(AppDbContext db, InstructionValidationService validationService) : ControllerBase
 {
     private const int MaxAttempts = 2;
 
@@ -106,6 +106,16 @@ public class TestsController(AppDbContext db) : ControllerBase
             return BadRequest(validationError);
         }
 
+        // Проверяем идентичность категории и вида инструктажа с материалом
+        var instructionError = await validationService.ValidateTestInstructionMatch(
+            request.TrainingMaterialId,
+            request.Category,
+            request.InstructionType);
+        if (instructionError is not null)
+        {
+            return BadRequest(instructionError);
+        }
+
         test.Title = request.Title;
         test.Description = request.Description;
         test.Category = request.Category;
@@ -139,6 +149,7 @@ public class TestsController(AppDbContext db) : ControllerBase
         await db.SaveChangesAsync();
         return NoContent();
     }
+
     [Authorize(Roles = "Admin,Manager")]
     [HttpPost("import-json")]
     public async Task<ActionResult<TestListDto>> ImportJson([FromBody] TestImportRequest request)
@@ -147,6 +158,16 @@ public class TestsController(AppDbContext db) : ControllerBase
         if (validationError is not null)
         {
             return BadRequest(validationError);
+        }
+
+        // Проверяем идентичность категории и вида инструктажа с материалом
+        var instructionError = await validationService.ValidateTestInstructionMatch(
+            request.TrainingMaterialId,
+            request.Category,
+            request.InstructionType);
+        if (instructionError is not null)
+        {
+            return BadRequest(instructionError);
         }
 
         var test = MapImportRequestToTest(request, User.GetUserId());
