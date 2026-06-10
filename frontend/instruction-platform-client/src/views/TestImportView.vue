@@ -39,14 +39,6 @@
               Срок прохождения
               <input v-model="assignDeadlines[testItem.id]" type="date">
             </label>
-            <label class="assign-deadline">
-              Вид инструктажа
-              <select v-model="assignInstructionTypes[testItem.id]">
-                <option v-for="item in instructionTypes" :key="item.value" :value="item.value">
-                  {{ item.label }}
-                </option>
-              </select>
-            </label>
             <button class="secondary assign-button" @click="assign(testItem.id)">Назначить выбранным отделам</button>
           </td>
           <td>
@@ -64,7 +56,7 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
 import { apiFetch, getCurrentUser } from '../api'
-import { categoryLabel, instructionTypeLabel, instructionTypes } from '../instructionLabels'
+import { categoryLabel, instructionTypeLabel } from '../instructionLabels'
 
 const tests = ref([])
 const departments = ref([])
@@ -73,17 +65,12 @@ const success = ref('')
 const deletingId = ref(null)
 const assignDepartmentIds = reactive({})
 const assignDeadlines = reactive({})
-const assignInstructionTypes = reactive({})
 const isAdmin = computed(() => getCurrentUser()?.role === 'Admin')
 
 async function load() {
   tests.value = await apiFetch('/api/tests')
   departments.value = (await apiFetch('/api/departments'))
     .filter((department) => department.name !== 'Administration')
-
-  for (const testItem of tests.value) {
-    assignInstructionTypes[testItem.id] = testItem.instructionType
-  }
 }
 
 async function assign(testId) {
@@ -97,7 +84,7 @@ async function assign(testId) {
       body: JSON.stringify({
         departmentIds: ids,
         deadline: assignDeadlines[testId] || null,
-        instructionType: assignInstructionTypes[testId] || testItem?.instructionType || 'Repeated'
+        instructionType: testItem?.instructionType || 'Repeated'
       })
     })
     success.value = 'Тест назначен выбранным отделам'
