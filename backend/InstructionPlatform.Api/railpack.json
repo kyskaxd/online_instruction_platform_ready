@@ -1,8 +1,11 @@
 {
   "$schema": "https://schema.railpack.com",
   "provider": "dotnet",
+  "build": {
+    "buildCommand": "dotnet restore && dotnet publish -c Release -o out"
+  },
   "deploy": {
-    "startCommand": "dotnet run --launch-profile https",
+    "startCommand": "dotnet out/InstructionPlatform.Api.dll",
     "port": 7150,
     "variables": {
       "ASPNETCORE_ENVIRONMENT": "Production",
