@@ -38,8 +38,8 @@ function clearLegacyStorage() {
 
 async function tryRefreshSession() {
   if (!refreshPromise) {
-    const fullUrl = API_BASE_URL ? `${API_BASE_URL}/api/auth/refresh` : '/api/auth/refresh';
-    refreshPromise = fetch(fullUrl, {
+      const fullUrl = API_BASE_URL ? `${API_BASE_URL}/api/auth/refresh` : '/api/auth/refresh';
+      refreshPromise = fetch(fullUrl, {
       method: 'POST',
       credentials: 'include'
     }).finally(() => {
@@ -79,7 +79,9 @@ export async function logout() {
   try {
     await apiFetch('/api/auth/logout', { method: 'POST' })
   } finally {
-    clearSession()
+      clearSession();
+      localStorage.clear();
+      sessionStorage.clear();
   }
 }
 
