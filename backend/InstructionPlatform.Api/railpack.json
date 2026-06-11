@@ -1,0 +1,12 @@
+{
+  "$schema": "https://schema.railpack.com",
+  "provider": "dotnet",
+  "deploy": {
+    "startCommand": "dotnet run --launch-profile https",
+    "port": 7150,
+    "variables": {
+      "ASPNETCORE_ENVIRONMENT": "Production",
+      "ASPNETCORE_URLS": "https://0.0.0.0:${PORT:-7150}"
+    }
+  }
+}
