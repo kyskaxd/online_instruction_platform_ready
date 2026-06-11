@@ -38,7 +38,8 @@ function clearLegacyStorage() {
 
 async function tryRefreshSession() {
   if (!refreshPromise) {
-    refreshPromise = fetch('/api/auth/refresh', {
+    const fullUrl = API_BASE_URL ? `${API_BASE_URL}/api/auth/refresh` : '/api/auth/refresh';
+    refreshPromise = fetch(fullUrl, {
       method: 'POST',
       credentials: 'include'
     }).finally(() => {
