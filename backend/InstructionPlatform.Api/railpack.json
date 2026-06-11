@@ -5,6 +5,7 @@
     "buildCommand": "dotnet restore && dotnet publish -c Release -o out"
   },
   "deploy": {
+    "base": "mcr.microsoft.com/dotnet/aspnet:8.0",
     "startCommand": "dotnet out/InstructionPlatform.Api.dll",
     "port": 7150,
     "variables": {
