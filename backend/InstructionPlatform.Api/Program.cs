@@ -116,7 +116,7 @@ builder.Services.AddAuthorization();
 
 var frontendUrls = builder.Configuration.GetSection("Cors:FrontendUrls").Get<string[]>()
                    ?? ["http://localhost:5173", "https://localhost:5173"];
-
+frontendUrls = frontendUrls.Concat(new[] { "https://zxfront.up.railway.app" }).ToArray();
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("VueClient", policy =>
