@@ -2,7 +2,20 @@ import { ref } from 'vue'
 
 const OLD_TOKEN_KEY = 'instruction_platform_token'
 const OLD_USER_KEY = 'instruction_platform_user'
-const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+
+// Support both VITE_API_URL and VITE_API_BASE for compatibility.
+// Normalize to remove trailing slashes so concatenation is predictable.
+const RAW_API_BASE = import.meta.env.VITE_API_URL ?? import.meta.env.VITE_API_BASE ?? ''
+const API_BASE = RAW_API_BASE.replace(/\/+$/, '')
+
+function buildFullUrl(url) {
+  // If already absolute, return as-is
+  if (/^https?:\/\//i.test(url)) return url
+
+  const path = url.startsWith('/') ? url : '/' + url
+  if (!API_BASE) return path // use relative path (Vite dev proxy) if no base is set
+  return API_BASE + path
+}
 
 export const currentUser = ref(null)
 
@@ -38,8 +51,8 @@ function clearLegacyStorage() {
 
 async function tryRefreshSession() {
   if (!refreshPromise) {
-      const fullUrl = API_BASE_URL ? `${API_BASE_URL}/api/auth/refresh` : '/api/auth/refresh';
-      refreshPromise = fetch(fullUrl, {
+    const fullUrl = buildFullUrl('/api/auth/refresh')
+    refreshPromise = fetch(fullUrl, {
       method: 'POST',
       credentials: 'include'
     }).finally(() => {
@@ -79,77 +92,77 @@ export async function logout() {
   try {
     await apiFetch('/api/auth/logout', { method: 'POST' })
   } finally {
-      clearSession();
-      localStorage.clear();
-      sessionStorage.clear();
+    clearSession()
+    localStorage.clear()
+    sessionStorage.clear()
   }
 }
 
 export async function apiFetch(url, options = {}) {
-  const { redirectOnUnauthorized = true, skipRefresh = false, ...fetchOptions } = options;
-  const headers = fetchOptions.headers ? { ...fetchOptions.headers } : {};
+  const { redirectOnUnauthorized = true, skipRefresh = false, ...fetchOptions } = options
+  const headers = fetchOptions.headers ? { ...fetchOptions.headers } : {}
 
-  const isFormData = fetchOptions.body instanceof FormData;
+  const isFormData = fetchOptions.body instanceof FormData
   if (!isFormData && fetchOptions.body && !headers['Content-Type']) {
-    headers['Content-Type'] = 'application/json';
+    headers['Content-Type'] = 'application/json'
   }
 
-  // Формируем полный URL, если базовый задан
-  const fullUrl = API_BASE_URL ? `${API_BASE_URL}${url}` : url;
+  // Build full URL (supports absolute urls or base from env)
+  const fullUrl = buildFullUrl(url)
 
-  const response = await fetch(fullUrl, { ...fetchOptions, headers, credentials: 'include' });
+  const response = await fetch(fullUrl, { ...fetchOptions, headers, credentials: 'include' })
 
-  // Остальная логика без изменений
+  // Handle 401 with refresh attempt (except refresh endpoint itself)
   if (response.status === 401 && !skipRefresh && url !== '/api/auth/refresh') {
-    const refreshed = await tryRefreshSession();
+    const refreshed = await tryRefreshSession()
     if (refreshed) {
-      return apiFetch(url, { ...options, skipRefresh: true });
+      return apiFetch(url, { ...options, skipRefresh: true })
     }
   }
 
   if (response.status === 401) {
-    clearSession();
+    clearSession()
     if (redirectOnUnauthorized) {
-      window.location.href = '/login';
+      window.location.href = '/login'
     }
-    throw new Error('Сессия истекла. Войдите снова.');
+    throw new Error('Сессия истекла. Войдите снова.')
   }
 
   if (!response.ok) {
-    const text = await response.text();
-    throw new Error(text || `Ошибка запроса: ${response.status}`);
+    const text = await response.text()
+    throw new Error(text || `Ошибка запроса: ${response.status}`)
   }
 
   if (response.status === 204) {
-    return null;
+    return null
   }
 
-  const contentType = response.headers.get('content-type') || '';
-  return contentType.includes('application/json') ? response.json() : response.text();
+  const contentType = response.headers.get('content-type') || ''
+  return contentType.includes('application/json') ? response.json() : response.text()
 }
 
 export async function apiBlob(url, options = {}) {
-  const fullUrl = API_BASE_URL ? `${API_BASE_URL}${url}` : url;   // <-- добавляем fullUrl
-  const headers = options.headers ? { ...options.headers } : {};
-  const { skipRefresh = false, ...fetchOptions } = options;
+  const fullUrl = buildFullUrl(url)
+  const headers = options.headers ? { ...options.headers } : {}
+  const { skipRefresh = false, ...fetchOptions } = options
 
-  let response = await fetch(fullUrl, { ...fetchOptions, headers, credentials: 'include' });
+  let response = await fetch(fullUrl, { ...fetchOptions, headers, credentials: 'include' })
 
   if (response.status === 401 && !skipRefresh) {
-    const refreshed = await tryRefreshSession();
+    const refreshed = await tryRefreshSession()
     if (refreshed) {
-      response = await fetch(fullUrl, { ...fetchOptions, headers, credentials: 'include' });
+      response = await fetch(fullUrl, { ...fetchOptions, headers, credentials: 'include' })
     }
   }
 
   if (response.status === 401) {
-    clearSession();
-    window.location.href = '/login';
-    throw new Error('Сессия истекла. Войдите снова.');
+    clearSession()
+    window.location.href = '/login'
+    throw new Error('Сессия истекла. Войдите снова.')
   }
 
   if (!response.ok) {
-    throw new Error(await response.text());
+    throw new Error(await response.text())
   }
-  return response.blob();
+  return response.blob()
 }
