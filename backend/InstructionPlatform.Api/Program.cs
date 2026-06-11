@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Npgsql;
 
 var currentDirectory = Directory.GetCurrentDirectory();
 var contentRootPath = File.Exists(Path.Combine(currentDirectory, "appsettings.json"))
@@ -36,8 +37,39 @@ builder.Services.AddControllers()
         options.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
     });
 
+
+string connectionString;
+var databaseUrl = Environment.GetEnvironmentVariable("DATABASE_URL");
+if (!string.IsNullOrEmpty(databaseUrl))
+{
+    var uri = new Uri(databaseUrl);
+    var userInfo = uri.UserInfo.Split(':');
+    var username = userInfo[0];
+    var password = userInfo.Length > 1 ? userInfo[1] : "";
+    connectionString = new NpgsqlConnectionStringBuilder
+    {
+        Host = uri.Host,
+        Port = uri.Port,
+        Username = username,
+        Password = password,
+        Database = uri.AbsolutePath.TrimStart('/'),
+        SslMode = SslMode.Require,
+        // TrustServerCertificate = true // устарело, можно убрать
+    }.ConnectionString;
+}
+else
+{
+    connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+}
+
+// Добавить проверку, что connectionString не null или пустая
+if (string.IsNullOrEmpty(connectionString))
+{
+    throw new InvalidOperationException("Connection string is not configured.");
+}
+
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseNpgsql(connectionString));
 
 builder.Services.AddScoped<PasswordHashService>();
 builder.Services.AddScoped<JwtTokenService>();
@@ -155,12 +187,13 @@ using (var scope = app.Services.CreateScope())
     await seeder.SeedAsync();
 }
 
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
-
+// if (app.Environment.IsDevelopment())
+// {
+//     app.UseSwagger();
+//     app.UseSwaggerUI();
+// }
+app.UseSwagger();
+app.UseSwaggerUI();
 if (!app.Environment.IsDevelopment())
 {
     app.UseHttpsRedirection();
