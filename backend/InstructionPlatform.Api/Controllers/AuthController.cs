@@ -181,7 +181,6 @@ public class AuthController(
             HttpOnly = true,
             Secure = !environment.IsDevelopment(),
             SameSite = environment.IsDevelopment() ? SameSiteMode.Lax : SameSiteMode.None,
-            Domain = environment.IsDevelopment() ? null : ".railway.app",
             Path = "/",
             Expires = expires
         };
@@ -189,20 +188,8 @@ public class AuthController(
 
     private void ClearAuthCookies()
     {
-        var domains = new[] { null, ".railway.app", "zxback.up.railway.app" };
-        foreach (var domain in domains)
-        {
-            var options = new CookieOptions
-            {
-                Domain = domain,
-                Path = "/",
-                HttpOnly = true,
-                Secure = true,
-                SameSite = SameSiteMode.None
-            };
-            Response.Cookies.Delete(AccessTokenCookieName, options);
-            Response.Cookies.Delete(RefreshTokenCookieName, options);
-        }
+        Response.Cookies.Delete(AccessTokenCookieName);
+        Response.Cookies.Delete(RefreshTokenCookieName);
     }
 
     private static DateTime? ToUtc(DateTime? value)
