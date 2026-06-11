@@ -126,26 +126,27 @@ export async function apiFetch(url, options = {}) {
 }
 
 export async function apiBlob(url, options = {}) {
-  const headers = options.headers ? { ...options.headers } : {}
-  const { skipRefresh = false, ...fetchOptions } = options
+  const fullUrl = API_BASE_URL ? `${API_BASE_URL}${url}` : url;   // <-- добавляем fullUrl
+  const headers = options.headers ? { ...options.headers } : {};
+  const { skipRefresh = false, ...fetchOptions } = options;
 
-  let response = await fetch(url, { ...fetchOptions, headers, credentials: 'include' })
+  let response = await fetch(fullUrl, { ...fetchOptions, headers, credentials: 'include' });
 
   if (response.status === 401 && !skipRefresh) {
-    const refreshed = await tryRefreshSession()
+    const refreshed = await tryRefreshSession();
     if (refreshed) {
-      response = await fetch(url, { ...fetchOptions, headers, credentials: 'include' })
+      response = await fetch(fullUrl, { ...fetchOptions, headers, credentials: 'include' });
     }
   }
 
   if (response.status === 401) {
-    clearSession()
-    window.location.href = '/login'
-    throw new Error('Сессия истекла. Войдите снова.')
+    clearSession();
+    window.location.href = '/login';
+    throw new Error('Сессия истекла. Войдите снова.');
   }
 
   if (!response.ok) {
-    throw new Error(await response.text())
+    throw new Error(await response.text());
   }
-  return response.blob()
+  return response.blob();
 }

@@ -1,3 +1,4 @@
+
 <template>
   <section class="card">
     <h1>Обучающие материалы</h1>
