@@ -188,8 +188,9 @@ public class AuthController(
 
     private void ClearAuthCookies()
     {
-        Response.Cookies.Delete(AccessTokenCookieName);
-        Response.Cookies.Delete(RefreshTokenCookieName);
+        var expired = DateTimeOffset.UtcNow.AddYears(-1);
+        Response.Cookies.Append(AccessTokenCookieName, string.Empty, CreateCookieOptions(expired));
+        Response.Cookies.Append(RefreshTokenCookieName, string.Empty, CreateCookieOptions(expired));
     }
 
     private static DateTime? ToUtc(DateTime? value)

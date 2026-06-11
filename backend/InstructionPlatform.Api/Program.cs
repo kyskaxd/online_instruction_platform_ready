@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Npgsql;
+using Microsoft.AspNetCore.HttpOverrides;
 
 var currentDirectory = Directory.GetCurrentDirectory();
 var contentRootPath = File.Exists(Path.Combine(currentDirectory, "appsettings.json"))
@@ -194,6 +195,10 @@ using (var scope = app.Services.CreateScope())
 // }
 app.UseSwagger();
 app.UseSwaggerUI();
+app.UseForwardedHeaders(new ForwardedHeadersOptions
+{
+    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
+});
 if (!app.Environment.IsDevelopment())
 {
     app.UseHttpsRedirection();
