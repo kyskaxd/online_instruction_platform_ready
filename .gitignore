@@ -1,0 +1,11 @@
+**/bin/
+**/obj/
+**/node_modules/
+**/dist/
+**/uploads/
+**/data-protection-keys/
+.vs/
+.idea/
+*.user
+*.suo
+.env
