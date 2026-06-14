@@ -88,9 +88,7 @@
         </tr>
         <tr v-for="testItem in filteredTests" :key="testItem.id">
           <td><b>{{ testItem.title }}</b><br /><small>{{ testItem.description }}</small></td>
-          <td>
-            <span class="creator-id">{{ testItem.createdByUserId }}</span>
-          </td>
+          
           <td>
             {{ categoryLabel(testItem.category) }}<br>
             <small>{{ instructionTypeLabel(testItem.instructionType) }}</small>
