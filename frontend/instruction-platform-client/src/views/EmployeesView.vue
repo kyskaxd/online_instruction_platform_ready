@@ -331,7 +331,7 @@ async function toggleActive(employee) {
 
   try {
     if (employee.isActive) {
-      await apiFetch(`/api/employees/${employee.id}`, { method: 'DELETE' })
+      await apiFetch(`/api/employees/${employee.id}/delete`, { method: 'POST' })
       success.value = 'Сотрудник заблокирован'
     } else {
       await apiFetch(`/api/employees/${employee.id}/activate`, { method: 'POST' })

@@ -175,7 +175,7 @@ public class EmployeesController(AppDbContext db, PasswordHashService passwordHa
     }
 
     [Authorize(Roles = "Admin,HR")]
-    [HttpDelete("{id:int}")]
+    [HttpPost("{id:int}/delete")]
     public async Task<IActionResult> Delete(int id)
     {
         var currentUserId = User.GetUserId();

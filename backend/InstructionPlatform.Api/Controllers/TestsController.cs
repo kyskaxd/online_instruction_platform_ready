@@ -18,7 +18,7 @@ public class TestsController(AppDbContext db, InstructionValidationService valid
 {
     private const int MaxAttempts = 2;
 
-    [Authorize(Roles = "Admin,Manager")]
+    [Authorize(Roles = "Admin,Manager,HR")]
     [HttpGet]
     public async Task<ActionResult<List<TestListDto>>> GetAll()
     {
@@ -37,7 +37,8 @@ public class TestsController(AppDbContext db, InstructionValidationService valid
                 x.PassingScorePercent,
                 x.Questions.Count,
                 x.CreatedAt,
-                x.TrainingMaterialId))
+                x.TrainingMaterialId,
+                x.CreatedByUserId))
             .ToListAsync();
 
         return Ok(tests);
@@ -68,6 +69,7 @@ public class TestsController(AppDbContext db, InstructionValidationService valid
             RetrainingIntervalMonths = test.RetrainingIntervalMonths,
             TrainingMaterialId = test.TrainingMaterialId,
             PassingScorePercent = test.PassingScorePercent,
+            CreatedByUserId = test.CreatedByUserId,
             Questions = test.Questions.Select(q => new TestDetailQuestionDto
             {
                 Id = q.Id,
@@ -184,10 +186,11 @@ public class TestsController(AppDbContext db, InstructionValidationService valid
             test.PassingScorePercent,
             test.Questions.Count,
             test.CreatedAt,
-            test.TrainingMaterialId));
+            test.TrainingMaterialId,
+            test.CreatedByUserId));
     }
 
-    [Authorize(Roles = "Admin,Manager")]
+    [Authorize(Roles = "Admin,HR")]
     [HttpPost("{testId:int}/assign")]
     public async Task<IActionResult> Assign(int testId, AssignTestRequest request)
     {
@@ -277,7 +280,7 @@ public class TestsController(AppDbContext db, InstructionValidationService valid
     }
 
     [Authorize(Roles = "Admin")]
-    [HttpDelete("{testId:int}")]
+    [HttpPost("{testId:int}/delete")]
     public async Task<IActionResult> Delete(int testId)
     {
         var test = await db.Tests.FirstOrDefaultAsync(x => x.Id == testId);

@@ -6,7 +6,7 @@
         <router-link v-if="canViewMaterials" to="/materials">Материалы</router-link>
         <router-link v-if="isEmployee" to="/my-tests">Мои инструктажи</router-link>
         <router-link v-if="isAdmin || isHR || isManager" to="/employees">Сотрудники</router-link>
-        <router-link v-if="isManager" to="/tests/import">Тесты</router-link>
+        <router-link v-if="canViewTests" to="/tests/import">Тесты</router-link>
         <router-link v-if="isManager" to="/reports">Отчёты</router-link>
       </nav>
       <div class="userbox">
@@ -32,7 +32,8 @@ const isEmployee = computed(() => user.value?.role === 'Employee')
 const isAdmin = computed(() => user.value?.role === 'Admin')
 const isHR = computed(() => user.value?.role === 'HR')
 const isManager = computed(() => ['Admin', 'Manager'].includes(user.value?.role))
-const canViewMaterials = computed(() => !isHR.value)
+const canViewMaterials = computed(() => ['Admin', 'Manager', 'HR', 'Employee'].includes(user.value?.role))
+const canViewTests = computed(() => ['Admin', 'Manager', 'HR'].includes(user.value?.role))
 const roleLabel = computed(() => {
   const labels = {
     Admin: 'Админ',

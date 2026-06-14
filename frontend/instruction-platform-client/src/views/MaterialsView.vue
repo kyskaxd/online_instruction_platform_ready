@@ -33,8 +33,39 @@
     </form>
   </section>
 
+  <section v-if="activeMaterial" class="card">
+    <div class="viewer-header">
+      <h2>Просмотр: {{ activeMaterial.title }}</h2>
+      <button type="button" class="secondary" @click="closePdf">Закрыть</button>
+    </div>
+    <p v-if="isEmployee && !activeMaterial.studyStatus?.isAcknowledged">
+      Изучите материал и подтвердите ознакомление — без этого тест будет недоступен.
+    </p>
+    <iframe class="pdf-frame" :src="pdfUrl"></iframe>
+    <div v-if="isEmployee" class="ack-row">
+      <button
+        :disabled="acknowledging"
+        @click="acknowledge(activeMaterial.id)"
+      >
+        {{ activeMaterial.studyStatus?.isAcknowledged ? 'Ознакомление подтверждено' : 'Подтверждаю ознакомление с материалом' }}
+      </button>
+    </div>
+  </section>
+
   <section class="card">
-    <h2>Список материалов</h2>
+    <div class="materials-header">
+      <h2>Список материалов</h2>
+      <label class="category-filter">
+        Направление
+        <select v-model="selectedCategory">
+          <option value="">Все направления</option>
+          <option v-for="item in instructionCategories" :key="item.value" :value="item.value">
+            {{ item.label }}
+          </option>
+        </select>
+      </label>
+    </div>
+
     <table>
       <thead>
         <tr>
@@ -47,7 +78,10 @@
         </tr>
       </thead>
       <tbody>
-        <tr v-for="material in materials" :key="material.id">
+        <tr v-if="filteredMaterials.length === 0">
+          <td :colspan="isEmployee ? 6 : 5" class="empty-row">Материалы не найдены.</td>
+        </tr>
+        <tr v-for="material in filteredMaterials" :key="material.id">
           <td>
             <span class="material-id">{{ material.id }}</span>
           </td>
@@ -72,22 +106,6 @@
       </tbody>
     </table>
   </section>
-
-  <section v-if="activeMaterial" class="card">
-    <h2>Просмотр: {{ activeMaterial.title }}</h2>
-    <p v-if="isEmployee && !activeMaterial.studyStatus?.isAcknowledged">
-      Изучите материал и подтвердите ознакомление — без этого тест будет недоступен.
-    </p>
-    <iframe class="pdf-frame" :src="pdfUrl"></iframe>
-    <div v-if="isEmployee" class="ack-row">
-      <button
-        :disabled="acknowledging"
-        @click="acknowledge(activeMaterial.id)"
-      >
-        {{ activeMaterial.studyStatus?.isAcknowledged ? 'Ознакомление подтверждено' : 'Подтверждаю ознакомление с материалом' }}
-      </button>
-    </div>
-  </section>
 </template>
 
 <script setup>
@@ -107,6 +125,7 @@ const error = ref('')
 const success = ref('')
 const acknowledging = ref(false)
 const file = ref(null)
+const selectedCategory = ref('')
 const user = currentUser
 const isManager = computed(() => ['Admin', 'Manager'].includes(user.value?.role))
 const isEmployee = computed(() => user.value?.role === 'Employee')
@@ -116,6 +135,14 @@ const form = reactive({
   category: 'OccupationalSafety',
   instructionType: 'Repeated',
   retrainingIntervalMonths: 12
+})
+
+const filteredMaterials = computed(() => {
+  if (!selectedCategory.value) {
+    return materials.value
+  }
+
+  return materials.value.filter((material) => material.category === selectedCategory.value)
 })
 
 function onFileChange(event) {
@@ -165,6 +192,15 @@ async function openPdf(material) {
   }
 }
 
+function closePdf() {
+  if (pdfUrl.value) {
+    URL.revokeObjectURL(pdfUrl.value)
+  }
+
+  pdfUrl.value = ''
+  activeMaterial.value = null
+}
+
 async function acknowledge(materialId) {
   acknowledging.value = true
   error.value = ''
@@ -190,6 +226,39 @@ onMounted(loadMaterials)
 </script>
 
 <style scoped>
+.materials-header {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.materials-header h2 {
+  margin: 0;
+}
+
+.viewer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.viewer-header h2 {
+  margin: 0;
+}
+
+.category-filter {
+  min-width: 260px;
+}
+
+.empty-row {
+  color: #667085;
+  text-align: center;
+}
+
 .category-badge {
   font-weight: 700;
 }
