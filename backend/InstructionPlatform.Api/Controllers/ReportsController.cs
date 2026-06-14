@@ -10,7 +10,7 @@ namespace InstructionPlatform.Api.Controllers;
 
 [ApiController]
 [Route("api/reports")]
-[Authorize(Roles = "Admin,Manager")]
+[Authorize(Roles = "Admin,Manager,HR")]
 public class ReportsController(AppDbContext db) : ControllerBase
 {
     [HttpGet("test-results")]

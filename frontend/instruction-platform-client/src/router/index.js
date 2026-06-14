@@ -23,7 +23,7 @@ const routes = [
   { path: '/my-tests', name: 'my-tests', component: MyTestsView, meta: { requiresAuth: true, roles: ['Employee'] } },
   { path: '/tests/:id/take', name: 'test-passing', component: TestPassingView, meta: { requiresAuth: true, roles: ['Employee'] } },
   { path: '/tests/:id/result', name: 'test-result', component: TestResultView, meta: { requiresAuth: true, roles: ['Employee'] } },
-  { path: '/reports', name: 'reports', component: ReportsView, meta: { requiresAuth: true, roles: ['Admin', 'Manager'] } }
+  { path: '/reports', name: 'reports', component: ReportsView, meta: { requiresAuth: true, roles: ['Admin', 'Manager', 'HR'] } }
 ]
 
 const router = createRouter({
