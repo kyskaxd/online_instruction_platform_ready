@@ -1,6 +1,17 @@
 <template>
   <section class="card">
-    <h1>Мои инструктажи</h1>
+    <div class="tests-header">
+      <h1>Мои инструктажи</h1>
+      <label class="category-filter">
+        Направление
+        <select v-model="selectedCategory">
+          <option value="">Все направления</option>
+          <option v-for="item in instructionCategories" :key="item.value" :value="item.value">
+            {{ item.label }}
+          </option>
+        </select>
+      </label>
+    </div>
     <div v-if="error" class="error">{{ error }}</div>
     <table>
       <thead>
@@ -16,7 +27,10 @@
         </tr>
       </thead>
       <tbody>
-        <tr v-for="item in assignments" :key="item.assignmentId">
+        <tr v-if="filteredAssignments.length === 0">
+          <td colspan="8" class="empty-row">Инструктажи не найдены.</td>
+        </tr>
+        <tr v-for="item in filteredAssignments" :key="item.assignmentId">
           <td>
             <b>{{ item.testTitle }}</b><br>
             <small>{{ instructionTypeLabel(item.instructionType) }}</small>
@@ -49,17 +63,27 @@
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { apiFetch } from '../api'
 import {
   categoryLabel,
   formatDate,
+  instructionCategories,
   instructionTypeLabel,
   isRetrainingOverdue
 } from '../instructionLabels'
 
 const assignments = ref([])
 const error = ref('')
+const selectedCategory = ref('')
+
+const filteredAssignments = computed(() => {
+  if (!selectedCategory.value) {
+    return assignments.value
+  }
+
+  return assignments.value.filter((item) => item.category === selectedCategory.value)
+})
 
 const statusLabels = {
   Assigned: 'Назначен',
@@ -97,6 +121,27 @@ onMounted(load)
 </script>
 
 <style scoped>
+.tests-header {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.tests-header h1 {
+  margin: 0;
+}
+
+.category-filter {
+  min-width: 260px;
+}
+
+.empty-row {
+  color: #667085;
+  text-align: center;
+}
+
 .status-text {
   font-weight: 700;
 }

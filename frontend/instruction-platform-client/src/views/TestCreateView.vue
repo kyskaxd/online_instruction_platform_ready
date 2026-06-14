@@ -49,7 +49,7 @@
         <select v-model="test.trainingMaterialId">
           <option :value="null">Без привязки к материалу</option>
           <option v-for="material in filteredMaterials" :key="material.id" :value="material.id">
-            {{ material.title }}
+            ID {{ material.id }} — {{ material.title }}
           </option>
         </select>
         <small v-if="materials.length > 0 && filteredMaterials.length === 0">

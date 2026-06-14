@@ -2,33 +2,102 @@
   <section class="card">
     <div class="header-row">
       <h1>Тесты</h1>
-      <router-link to="/tests/create" class="button primary">Создать тест</router-link>
+      <router-link v-if="canManageTests" to="/tests/create" class="button primary">Создать тест</router-link>
     </div>
     <div v-if="error" class="error">{{ error }}</div>
     <div v-if="success" class="success">{{ success }}</div>
 
-    <h2>Список тестов</h2>
+    <div v-if="canManageTests" class="import-panel">
+      <div>
+        <h2>Импорт теста из JSON</h2>
+        <p>Выберите JSON-файл или вставьте содержимое вручную.</p>
+      </div>
+
+      <div class="import-grid">
+        <label>
+          JSON-файл
+          <input type="file" accept=".json,application/json" @change="handleJsonFile" />
+        </label>
+
+        <label>
+          Содержимое JSON
+          <textarea
+            v-model="jsonText"
+            rows="10"
+            placeholder='
+"title": "Название",
+"description": "Описание",
+"category": "Категория",
+"instructionType": "Тип инструктажа (Repeated, Primary, Specialized)",
+"retrainingIntervalMonths": Срок повторного прохождения,
+"passingScorePercent": Процент необходимый для прохождения,
+"trainingMaterialId": id обучающего материала (если есть),
+"questions": [
+  {
+    "text": "Вопрос",
+    "type": "тип вопроса (SingleChoice, MultipleChoice, OpenEnded)",
+    "options": [
+      {
+        "text": "Ответ",
+        "isCorrect": тип ответа (true - правильный, false - неправильный)
+      }
+    ]
+  },'
+          ></textarea>
+        </label>
+      </div>
+
+      <div class="import-actions">
+        <button class="primary" :disabled="importing || !jsonText.trim()" @click="importJson">
+          {{ importing ? 'Импорт...' : 'Импортировать JSON' }}
+        </button>
+        <button type="button" class="secondary" :disabled="importing || !jsonText" @click="clearJson">
+          Очистить
+        </button>
+      </div>
+    </div>
+
+    <div class="tests-header">
+      <h2>Список тестов</h2>
+      <label class="category-filter">
+        Направление
+        <select v-model="selectedCategory">
+          <option value="">Все направления</option>
+          <option v-for="item in instructionCategories" :key="item.value" :value="item.value">
+            {{ item.label }}
+          </option>
+        </select>
+      </label>
+    </div>
+
     <table>
       <thead>
         <tr>
           <th>Тест</th>
+          <th>Создал</th>
           <th>Направление</th>
           <th>Вопросов</th>
           <th>Проходной балл</th>
-          <th>Назначить</th>
-          <th></th>
+          <th v-if="canAssignTests">Назначить</th>
+          <th v-if="canManageTests || canDeleteTests"></th>
         </tr>
       </thead>
       <tbody>
-        <tr v-for="testItem in tests" :key="testItem.id">
+        <tr v-if="filteredTests.length === 0">
+          <td :colspan="tableColumnCount" class="empty-row">Тесты не найдены.</td>
+        </tr>
+        <tr v-for="testItem in filteredTests" :key="testItem.id">
           <td><b>{{ testItem.title }}</b><br /><small>{{ testItem.description }}</small></td>
+          <td>
+            <span class="creator-id">{{ testItem.createdByUserId }}</span>
+          </td>
           <td>
             {{ categoryLabel(testItem.category) }}<br>
             <small>{{ instructionTypeLabel(testItem.instructionType) }}</small>
           </td>
           <td>{{ testItem.questionsCount }}</td>
           <td>{{ testItem.passingScorePercent }}%</td>
-          <td>
+          <td v-if="canAssignTests">
             <select v-model="assignDepartmentIds[testItem.id]" multiple class="assign-select">
               <option v-for="department in departments" :key="department.id" :value="department.id">
                 {{ department.name }}
@@ -39,12 +108,12 @@
               Срок прохождения
               <input v-model="assignDeadlines[testItem.id]" type="date">
             </label>
-            <button class="secondary assign-button" @click="assign(testItem.id)">Назначить выбранным отделам</button>
+            <button style="margin-top: 10px;" class="secondary assign-button" @click="assign(testItem.id)">Назначить выбранным отделам</button>
           </td>
-          <td>
+          <td v-if="canManageTests || canDeleteTests">
             <div class="action-buttons">
-              <router-link :to="`/tests/${testItem.id}/edit`" class="action-btn edit">Редактировать</router-link>
-              <button class="action-btn danger" :disabled="deletingId === testItem.id" @click="deleteTest(testItem)">Удалить</button>
+              <router-link v-if="canManageTests" :to="`/tests/${testItem.id}/edit`" class="action-btn edit">Редактировать</router-link>
+              <button v-if="canDeleteTests" class="action-btn danger" :disabled="deletingId === testItem.id" @click="deleteTest(testItem)">Удалить</button>
             </div>
           </td>
         </tr>
@@ -56,21 +125,40 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
 import { apiFetch, getCurrentUser } from '../api'
-import { categoryLabel, instructionTypeLabel } from '../instructionLabels'
+import { categoryLabel, instructionCategories, instructionTypeLabel } from '../instructionLabels'
 
 const tests = ref([])
 const departments = ref([])
 const error = ref('')
 const success = ref('')
 const deletingId = ref(null)
+const importing = ref(false)
+const jsonText = ref('')
+const selectedCategory = ref('')
 const assignDepartmentIds = reactive({})
 const assignDeadlines = reactive({})
-const isAdmin = computed(() => getCurrentUser()?.role === 'Admin')
+const currentRole = computed(() => getCurrentUser()?.role)
+const canAssignTests = computed(() => ['Admin', 'HR'].includes(currentRole.value))
+const canManageTests = computed(() => ['Admin', 'Manager'].includes(currentRole.value))
+const canDeleteTests = computed(() => currentRole.value === 'Admin')
+const tableColumnCount = computed(() => 5 + (canAssignTests.value ? 1 : 0) + (canManageTests.value || canDeleteTests.value ? 1 : 0))
+
+const filteredTests = computed(() => {
+  if (!selectedCategory.value) {
+    return tests.value
+  }
+
+  return tests.value.filter((testItem) => testItem.category === selectedCategory.value)
+})
 
 async function load() {
   tests.value = await apiFetch('/api/tests')
-  departments.value = (await apiFetch('/api/departments'))
-    .filter((department) => department.name !== 'Administration')
+  if (canAssignTests.value) {
+    departments.value = (await apiFetch('/api/departments'))
+      .filter((department) => department.name !== 'Administration')
+  } else {
+    departments.value = []
+  }
 }
 
 async function assign(testId) {
@@ -93,6 +181,57 @@ async function assign(testId) {
   }
 }
 
+function clearJson() {
+  jsonText.value = ''
+}
+
+async function handleJsonFile(event) {
+  error.value = ''
+  success.value = ''
+
+  const file = event.target.files?.[0]
+  if (!file) {
+    return
+  }
+
+  try {
+    jsonText.value = await file.text()
+  } catch {
+    error.value = 'Не удалось прочитать JSON-файл'
+  } finally {
+    event.target.value = ''
+  }
+}
+
+async function importJson() {
+  error.value = ''
+  success.value = ''
+
+  let payload
+  try {
+    payload = JSON.parse(jsonText.value)
+  } catch {
+    error.value = 'JSON содержит ошибку. Проверьте формат файла.'
+    return
+  }
+
+  importing.value = true
+
+  try {
+    const createdTest = await apiFetch('/api/tests/import-json', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    })
+    success.value = `Тест "${createdTest.title}" импортирован`
+    clearJson()
+    await load()
+  } catch (e) {
+    error.value = e.message
+  } finally {
+    importing.value = false
+  }
+}
+
 async function deleteTest(testItem) {
   if (!confirm(`Удалить тест "${testItem.title}"?`)) {
     return
@@ -103,7 +242,7 @@ async function deleteTest(testItem) {
   deletingId.value = testItem.id
 
   try {
-    await apiFetch(`/api/tests/${testItem.id}`, { method: 'DELETE' })
+    await apiFetch(`/api/tests/${testItem.id}/delete`, { method: 'POST' })
     success.value = 'Тест удалён'
     await load()
   } catch (e) {
@@ -143,6 +282,67 @@ onMounted(load)
 
 .primary:hover {
   background: #0056b3;
+}
+
+.import-panel {
+  display: grid;
+  gap: 16px;
+  border: 1px solid #e6e9f2;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 24px;
+  background: #f8faff;
+}
+
+.import-panel h2 {
+  margin: 0 0 6px;
+}
+
+.import-panel p {
+  margin: 0;
+  color: #667085;
+}
+
+.import-grid {
+  display: grid;
+  gap: 14px;
+}
+
+.import-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.tests-header {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.tests-header h2 {
+  margin: 0;
+}
+
+.category-filter {
+  min-width: 260px;
+}
+
+.empty-row {
+  color: #667085;
+  text-align: center;
+}
+
+.creator-id {
+  display: inline-flex;
+  min-width: 36px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  background: #edf0ff;
+  color: #2653ff;
+  font-weight: 800;
 }
 
 .action-buttons {

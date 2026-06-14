@@ -28,7 +28,7 @@ import { apiFetch, setSession } from '../api'
 const router = useRouter()
 const loading = ref(false)
 const error = ref('')
-const form = reactive({ email: 'admin@local.test', password: 'Admin123!' })
+const form = reactive({ email: '', password: '' })
 
 async function login() {
   loading.value = true

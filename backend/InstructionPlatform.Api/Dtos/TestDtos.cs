@@ -38,7 +38,8 @@ public record TestListDto(
     int PassingScorePercent,
     int QuestionsCount,
     DateTime CreatedAt,
-    int? TrainingMaterialId);
+    int? TrainingMaterialId,
+    int CreatedByUserId);
 
 public record AssignTestRequest(
     List<int>? EmployeeIds,
@@ -135,6 +136,7 @@ public class TestDetailDto
     public int RetrainingIntervalMonths { get; set; }
     public int? TrainingMaterialId { get; set; }
     public int PassingScorePercent { get; set; }
+    public int CreatedByUserId { get; set; }
     public List<TestDetailQuestionDto> Questions { get; set; } = [];
 }
 

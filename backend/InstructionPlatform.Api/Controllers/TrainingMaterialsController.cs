@@ -282,7 +282,7 @@ public class TrainingMaterialsController(AppDbContext db, IConfiguration configu
     }
 
     [Authorize(Roles = "Admin,Manager")]
-    [HttpDelete("{id:int}")]
+    [HttpPost("{id:int}/delete")]
     public async Task<IActionResult> Delete(int id)
     {
         var material = await db.TrainingMaterials.FirstOrDefaultAsync(x => x.Id == id);

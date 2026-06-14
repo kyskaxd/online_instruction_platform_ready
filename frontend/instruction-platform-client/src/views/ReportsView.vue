@@ -35,9 +35,12 @@
       </label>
       <div class="report-actions">
         <button @click="loadReport">Показать</button>
-        <button class="secondary" @click="downloadExcel">Скачать Excel</button>
+        <button class="secondary" :disabled="!filters.category" @click="downloadExcel">Скачать Excel</button>
       </div>
     </div>
+    <p class="report-hint">
+      Для выгрузки Excel выберите одно направление.
+    </p>
   </section>
 
   <section class="card">
@@ -122,13 +125,18 @@ async function loadReport() {
 
 async function downloadExcel() {
   error.value = ''
+  if (!filters.category) {
+    error.value = 'Для выгрузки Excel выберите одно направление.'
+    return
+  }
+
   try {
     const query = buildQuery()
     const blob = await apiBlob(`/api/reports/test-results.xlsx${query ? '?' + query : ''}`)
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = 'test-results.xlsx'
+    link.download = `test-results-${filters.category}.xlsx`
     link.click()
     URL.revokeObjectURL(url)
   } catch (e) {
@@ -160,6 +168,11 @@ onMounted(async () => {
   display: flex;
   align-items: end;
   gap: 10px;
+}
+
+.report-hint {
+  margin: 14px 0 0;
+  color: #667085;
 }
 
 .status-text {
