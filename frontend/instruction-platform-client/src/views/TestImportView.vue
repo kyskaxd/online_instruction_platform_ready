@@ -137,7 +137,7 @@ const assignDepartmentIds = reactive({})
 const assignDeadlines = reactive({})
 const currentRole = computed(() => getCurrentUser()?.role)
 const canAssignTests = computed(() => ['Admin', 'HR'].includes(currentRole.value))
-const canManageTests = computed(() => ['Admin', 'Manager'].includes(currentRole.value))
+const canManageTests = computed(() => ['Admin', 'HR'].includes(currentRole.value))
 const canDeleteTests = computed(() => currentRole.value === 'Admin')
 const tableColumnCount = computed(() => 5 + (canAssignTests.value ? 1 : 0) + (canManageTests.value || canDeleteTests.value ? 1 : 0))
 

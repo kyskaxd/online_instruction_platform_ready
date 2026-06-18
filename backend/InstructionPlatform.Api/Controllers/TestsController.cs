@@ -18,7 +18,7 @@ public class TestsController(AppDbContext db, InstructionValidationService valid
 {
     private const int MaxAttempts = 2;
 
-    [Authorize(Roles = "Admin,Manager,HR")]
+    [Authorize(Roles = "Admin,HR")]
     [HttpGet]
     public async Task<ActionResult<List<TestListDto>>> GetAll()
     {
@@ -44,7 +44,7 @@ public class TestsController(AppDbContext db, InstructionValidationService valid
         return Ok(tests);
     }
 
-    [Authorize(Roles = "Admin,Manager")]
+    [Authorize(Roles = "Admin,HR")]
     [HttpGet("{testId:int}")]
     public async Task<ActionResult<TestDetailDto>> GetById(int testId)
     {
@@ -88,7 +88,7 @@ public class TestsController(AppDbContext db, InstructionValidationService valid
         return Ok(dto);
     }
 
-    [Authorize(Roles = "Admin,Manager")]
+    [Authorize(Roles = "Admin,HR")]
     [HttpPut("{testId:int}")]
     public async Task<IActionResult> Update(int testId, [FromBody] TestImportRequest request)
     {
@@ -152,7 +152,7 @@ public class TestsController(AppDbContext db, InstructionValidationService valid
         return NoContent();
     }
 
-    [Authorize(Roles = "Admin,Manager")]
+    [Authorize(Roles = "Admin,HR")]
     [HttpPost("import-json")]
     public async Task<ActionResult<TestListDto>> ImportJson([FromBody] TestImportRequest request)
     {

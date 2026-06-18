@@ -33,7 +33,7 @@ const isAdmin = computed(() => user.value?.role === 'Admin')
 const isHR = computed(() => user.value?.role === 'HR')
 const isManager = computed(() => ['Admin', 'Manager'].includes(user.value?.role))
 const canViewMaterials = computed(() => ['Admin', 'Manager', 'HR', 'Employee'].includes(user.value?.role))
-const canViewTests = computed(() => ['Admin', 'Manager', 'HR'].includes(user.value?.role))
+const canViewTests = computed(() => ['Admin', 'HR'].includes(user.value?.role))
 const canViewReports = computed(() => ['Admin', 'Manager', 'HR'].includes(user.value?.role))
 const roleLabel = computed(() => {
   const labels = {
