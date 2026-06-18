@@ -29,7 +29,7 @@
         <input v-model.number="form.retrainingIntervalMonths" type="number" min="1" max="60" required>
       </label>
       <label>PDF-файл<input type="file" accept="application/pdf" @change="onFileChange" required></label>
-      <button>Загрузить PDF</button>
+      <button style="height: 55px; align-self:end">Загрузить PDF</button>
     </form>
   </section>
 

@@ -65,7 +65,7 @@
             <option value="HR" v-if="isAdmin">HR</option>
           </select>
         </label>
-        <button :disabled="isSaving">Добавить</button>
+        <button style="height: 45px; align-self:end" :disabled="isSaving">Добавить</button>
       </form>
     </div>
   </section>
